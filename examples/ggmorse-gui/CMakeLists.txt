@@ -26,6 +26,7 @@ if (EMSCRIPTEN)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/index-tmpl.html ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${TARGET}/index.html @ONLY)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/style.css ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${TARGET}/style.css COPYONLY)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/background-0.png ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${TARGET}/background-0.png COPYONLY)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/gghelpers.js ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${TARGET}/gghelpers.js COPYONLY)
 else()
     add_executable(${TARGET} main.cpp common.cpp interface.cpp interface-unix.cpp)
 

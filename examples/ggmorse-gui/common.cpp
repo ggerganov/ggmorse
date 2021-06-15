@@ -676,7 +676,7 @@ void renderMain() {
                 static bool isFrequencyAuto = true;
                 static bool isSpeedAuto = true;
 
-                auto p0 = ImGui::GetCursorScreenPos();
+                const auto p0 = ImGui::GetCursorScreenPos();
                 auto mainSize = ImGui::GetContentRegionAvail();
                 mainSize.x += frequencyMarkerSize;
                 mainSize.y -= rxDataHeight*ImGui::GetTextLineHeightWithSpacing() + 2.0f*style.ItemSpacing.y;
@@ -870,12 +870,59 @@ void renderMain() {
             }
 
             {
+                static bool isContextMenuOpen = false;
+                static bool isHoldingDown = false;
+
+                const auto p0 = ImGui::GetCursorScreenPos();
+                const auto mainSize = ImGui::GetContentRegionAvail();
+
                 ImGui::PushFont(ImGui::GetIO().Fonts->Fonts.back());
-                ImGui::BeginChild("Rx:data", ImGui::GetContentRegionAvail(), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+                ImGui::BeginChild("Rx:data", mainSize, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
                 ImGui::PushTextWrapPos(ImGui::GetContentRegionAvailWidth());
                 ImGui::Text("%s", rxData.c_str());
                 ImGui::PopTextWrapPos();
                 ImGui::SetScrollY(ImGui::GetScrollMaxY() - style.ItemSpacing.y);
+
+                if (!isContextMenuOpen) {
+                    auto p1 = p0;
+                    p1.x += mainSize.x;
+                    p1.y += mainSize.y;
+
+                    if (ImGui::IsMouseHoveringRect(p0, p1, true)) {
+                        if (ImGui::GetIO().MouseDownDuration[0] > tHoldContextPopup) {
+                            isHoldingDown = true;
+                        }
+                    }
+                }
+
+                if (ImGui::IsMouseReleased(0) && isHoldingDown) {
+                    auto pos = ImGui::GetMousePos();
+                    pos.x -= 1.0f*ImGui::CalcTextSize("Clear | Copy").x;
+                    pos.y -= 1.0f*ImGui::GetTextLineHeightWithSpacing();
+                    ImGui::SetNextWindowPos(pos);
+
+                    ImGui::OpenPopup("Rx options");
+                    isHoldingDown = false;
+                    isContextMenuOpen = true;
+                }
+
+                if (ImGui::BeginPopup("Rx options")) {
+                    if (ImGui::ButtonDisablable("Clear", {}, false)) {
+                        rxData.clear();
+                        ImGui::CloseCurrentPopup();
+                    }
+
+                    ImGui::SameLine();
+                    if (ImGui::ButtonDisablable("Copy", {}, false)) {
+                        SDL_SetClipboardText(rxData.c_str());
+                        ImGui::CloseCurrentPopup();
+                    }
+
+                    ImGui::EndPopup();
+                } else {
+                    isContextMenuOpen = false;
+                }
+
                 ImGui::EndChild();
                 ImGui::PopFont();
             }

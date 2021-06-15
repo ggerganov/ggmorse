@@ -39,6 +39,7 @@ else()
         ggmorse
         ggmorse-common
         ggmorse-common-sdl2
+        malloc-count
         imgui-sdl2
         ${CMAKE_THREAD_LIBS_INIT}
         )

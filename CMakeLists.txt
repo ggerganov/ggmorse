@@ -47,6 +47,8 @@ option(GGMORSE_SUPPORT_SDL2             "ggmorse: support for libSDL2" ${GGMORSE
 option(GGMORSE_BUILD_TESTS              "ggmorse: build examples" ${GGMORSE_STANDALONE})
 option(GGMORSE_BUILD_EXAMPLES           "ggmorse: build examples" ${GGMORSE_STANDALONE})
 
+option(GGMORSE_MALLOC_COUNT             "ggmorse: count memory allocations" OFF)
+
 # sanitizers
 
 if (GGMORSE_SANITIZE_THREAD)

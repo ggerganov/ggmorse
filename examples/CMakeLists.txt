@@ -59,6 +59,8 @@ if (MINGW)
     )
 endif()
 
+add_subdirectory(malloc-count)
+
 if (GGMORSE_SUPPORT_SDL2)
     # ggmorse-common-sdl2
 

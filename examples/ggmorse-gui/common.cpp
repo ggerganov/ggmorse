@@ -4,6 +4,8 @@
 
 #include "ggmorse/ggmorse.h"
 
+#include "malloc-count/malloc_count.h"
+
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 

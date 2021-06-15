@@ -484,6 +484,10 @@ void renderMain() {
             for (const auto & ch : stateCurrent.rxData) {
                 rxData += ch;
             }
+
+            if (rxData.size() > 512) {
+                rxData = rxData.substr(256);
+            }
         }
         if (stateCurrent.flags.newSignalF) {
             signalFCurrent = std::move(stateCurrent.signalF);

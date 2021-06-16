@@ -644,291 +644,414 @@ void renderMain() {
         ImGui::EndChild();
     }
 
-    if (windowId == WindowId::Tx) {
-        ImGui::BeginChild("Tx:main", ImGui::GetContentRegionAvail(), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-        ImGui::Text("Not implemented yet ...");
-        ImGui::EndChild();
-    }
+    //if (windowId == WindowId::Tx) {
+    //    ImGui::BeginChild("Tx:main", ImGui::GetContentRegionAvail(), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    //    ImGui::Text("Not implemented yet ...");
+    //    ImGui::EndChild();
+    //}
 
-    if (windowId == WindowId::Rx) {
-        if (hasAudioCaptureData == false) {
-            ImGui::Text("%s", "");
-            ImGui::TextColored({ 1.0f, 0.0f, 0.0f, 1.0f }, "No capture data available!");
-            ImGui::TextColored({ 1.0f, 0.0f, 0.0f, 1.0f }, "Please make sure you have allowed microphone access for this app.");
-        } else {
-            {
-                const int nBins = spectrogramCurrent[0].size()/2;
-                const float df = 0.5*statsCurrent.sampleRateInp/nBins;
+    static bool txRepeat = false;
+    static float txFrequency_hz = 550.0f;
+    static int txSpeedCharacters_wpm = 25;
+    static int txSpeedFarnsworth_wpm = 25;
 
-                static int binMin = 100.0f/df;
-                static int binMax = 1300.0f/df;
+    if (hasAudioCaptureData == false) {
+        ImGui::Text("%s", "");
+        ImGui::TextColored({ 1.0f, 0.0f, 0.0f, 1.0f }, "No capture data available!");
+        ImGui::TextColored({ 1.0f, 0.0f, 0.0f, 1.0f }, "Please make sure you have allowed microphone access for this app.");
+    } else {
+        {
+            const int nBins = spectrogramCurrent[0].size()/2;
+            const float df = 0.5*statsCurrent.sampleRateInp/nBins;
 
-                static float intensityScale = 30.0f;
-                static float rxDataHeight = 3.0f;
-                static float statsHeight = ImGui::GetTextLineHeight();
-                static float signalHeight = 3*statsHeight;
-                static float frequencyMarkerSize = 0.5f*ImGui::CalcTextSize("A").x;
-                static float frequencySelected_hz = 550.0f;
-                static float speedSelected_wpm = 25.0f;
+            static int binMin = 100.0f/df;
+            static int binMax = 1300.0f/df;
 
-                static ColorMap::Type colorMap = ColorMap::Type::Ggew;
+            static float intensityScale = 30.0f;
+            static float rxDataHeight = 3.0f;
+            static float statsHeight = ImGui::GetTextLineHeight();
+            static float signalHeight = 3*statsHeight;
+            static float frequencyMarkerSize = 0.5f*ImGui::CalcTextSize("A").x;
+            static float frequencySelected_hz = 550.0f;
+            static float speedSelected_wpm = 25.0f;
 
-                static bool showStats = true;
-                static bool showSignal = true;
-                static bool isHoldingDown = false;
-                static bool isContextMenuOpen = false;
-                static bool isFrequencyAuto = true;
-                static bool isSpeedAuto = true;
+            static ColorMap::Type colorMap = ColorMap::Type::Ggew;
 
-                const auto p0 = ImGui::GetCursorScreenPos();
-                auto mainSize = ImGui::GetContentRegionAvail();
-                mainSize.x += frequencyMarkerSize;
-                mainSize.y -= rxDataHeight*ImGui::GetTextLineHeightWithSpacing() + 2.0f*style.ItemSpacing.y;
+            static bool showStats = true;
+            static bool showSignal = true;
+            static bool isHoldingDown = false;
+            static bool isContextMenuOpen = false;
+            static bool isFrequencyAuto = true;
+            static bool isSpeedAuto = true;
 
-                auto itemSpacingSave = style.ItemSpacing;
-                style.ItemSpacing.x = 0.0f;
-                style.ItemSpacing.y = 0.0f;
+            const auto p0 = ImGui::GetCursorScreenPos();
+            auto mainSize = ImGui::GetContentRegionAvail();
+            mainSize.x += frequencyMarkerSize;
+            mainSize.y -= (windowId == WindowId::Rx ? rxDataHeight : 2.5f)*ImGui::GetTextLineHeightWithSpacing() + 2.0f*style.ItemSpacing.y;
 
-                auto windowPaddingSave = style.WindowPadding;
-                style.WindowPadding.x = 0.0f;
-                style.WindowPadding.y = 0.0f;
+            auto itemSpacingSave = style.ItemSpacing;
+            style.ItemSpacing.x = 0.0f;
+            style.ItemSpacing.y = 0.0f;
 
-                auto childBorderSizeSave = style.ChildBorderSize;
-                style.ChildBorderSize = 0.0f;
+            auto windowPaddingSave = style.WindowPadding;
+            style.WindowPadding.x = 0.0f;
+            style.WindowPadding.y = 0.0f;
 
-                ImGui::BeginChild("Rx:main", mainSize, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+            auto childBorderSizeSave = style.ChildBorderSize;
+            style.ChildBorderSize = 0.0f;
 
-                const int nx = spectrogramCurrent.size();
-                const int ny = binMax - binMin;
+            ImGui::BeginChild("Rx:main", mainSize, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
-                float sum = 0.0;
-                for (int i = 0; i < nx; ++i) {
-                    for (int j = 0; j < ny; ++j) {
-                        sum += spectrogramCurrent[i][binMin + j];
-                    }
-                }
+            const int nx = spectrogramCurrent.size();
+            const int ny = binMax - binMin;
 
-                sum /= (nx*ny);
-                if (sum == 0.0) sum = 1.0;
-
-                auto wSize = ImGui::GetContentRegionAvail();
-                wSize.x -= frequencyMarkerSize;
-
-                const float dx = wSize.x/nx;
-                const float dy = wSize.y/ny;
-
-                int nChildWindows = 0;
-                int nFreqPerChild = 32;
-                ImGui::PushID(nChildWindows++);
-                ImGui::BeginChild("Spectrogram", { wSize.x + frequencyMarkerSize, (nFreqPerChild + 1)*dy }, true);
-                auto drawList = ImGui::GetWindowDrawList();
-                auto drawList0 = ImGui::GetWindowDrawList();
-
+            float sum = 0.0;
+            for (int i = 0; i < nx; ++i) {
                 for (int j = 0; j < ny; ++j) {
-                    if (j > 0 && j % nFreqPerChild == 0) {
-                        ImGui::EndChild();
-                        ImGui::PopID();
-
-                        ImGui::PushID(nChildWindows++);
-                        ImGui::SetCursorScreenPos({ p0.x, p0.y + nFreqPerChild*int(j/nFreqPerChild)*dy });
-                        ImGui::BeginChild("Spectrogram", { wSize.x + frequencyMarkerSize, (nFreqPerChild + 1)*dy }, true);
-                        drawList = ImGui::GetWindowDrawList();
-                    }
-
-                    int k = binMin + j;
-                    for (int i = 0; i < nx; ++i) {
-                        auto c0 = ImGui::ColorConvertFloat4ToU32(getColor(colorMap, spectrogramCurrent[i][k]/(intensityScale*sum)));
-                        drawList->AddRectFilled({ p0.x + i*dx, p0.y + j*dy }, { p0.x + i*dx + dx, p0.y + j*dy + dy }, c0);
-
-                        //auto c1 =               i < nx - 1 ? ImGui::ColorConvertFloat4ToU32(getColor(ColorMap::Ggew, spectrogramCurrent[i + 1][k]/(intensityScale*sum))) : c0;
-                        //auto c2 = i < nx - 1 && j < ny - 1 ? ImGui::ColorConvertFloat4ToU32(getColor(ColorMap::Ggew, spectrogramCurrent[i + 1][k + 1]/(intensityScale*sum))) : c0;
-                        //auto c3 =               j < ny - 1 ? ImGui::ColorConvertFloat4ToU32(getColor(ColorMap::Ggew, spectrogramCurrent[i][k + 1]/(intensityScale*sum))) : c0;
-                        //drawList->AddRectFilledMultiColor({ p0.x + i*dx, p0.y + j*dy }, { p0.x + i*dx + dx, p0.y + j*dy + dy }, c0, c1, c2, c3);
-                    }
-
-                    const auto & f = statsCurrent.statistics.estimatedPitch_Hz;
-                    if (f >= k*df && f < (k + 1)*df) {
-                        drawList0->AddTriangleFilled({ p0.x + wSize.x,                  p0.y + j*dy + 0.5f*dy },
-                                                     { p0.x + wSize.x + frequencyMarkerSize, p0.y + j*dy + 0.5f*dy - 0.5f*frequencyMarkerSize },
-                                                     { p0.x + wSize.x + frequencyMarkerSize, p0.y + j*dy + 0.5f*dy + 0.5f*frequencyMarkerSize },
-                                                     ImGui::ColorConvertFloat4ToU32({ 1.0f, 1.0f, 0.0f, 1.0f }));
-                    }
-                }
-
-                ImGui::EndChild();
-                ImGui::PopID();
-
-                ImGui::SetCursorScreenPos(p0);
-                ImGui::BeginChild("Stats", { wSize.x + frequencyMarkerSize, mainSize.y }, true);
-                if (showSignal) {
-                    ImGui::SetCursorScreenPos({ p0.x, p0.y + wSize.y - signalHeight });
-                    ImGui::PlotHistogram("##signal", signalFCurrent.data(), signalFCurrent.size(), 0, NULL, FLT_MAX, FLT_MAX, { wSize.x, signalHeight });
-                    drawList->AddLine({ p0.x, p0.y + wSize.y - statsCurrent.statistics.signalThreshold*signalHeight },
-                                       { p0.x + wSize.x, p0.y + wSize.y - statsCurrent.statistics.signalThreshold*signalHeight },
-                                       ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.0f, 0.0f, 0.75f }));
-                }
-
-                if (showStats) {
-                    ImGui::SetCursorScreenPos({ p0.x + 0.5f*itemSpacingSave.x, p0.y + wSize.y - statsHeight });
-                    ImGui::PushFont(ImGui::GetIO().Fonts->Fonts.back());
-                    ImGui::TextColored({ 1.0f, 1.0f, 0.0f, 1.0f }, "F: %6.1f Hz | S: %2.0f WPM | FPS: %4.1f | R: %4.1f ms",
-                                       statsCurrent.statistics.estimatedPitch_Hz,
-                                       statsCurrent.statistics.estimatedSpeed_wpm,
-                                       ImGui::GetIO().Framerate,
-                                       tLastFrame
-                                      );
-                    ImGui::PopFont();
-                }
-                ImGui::EndChild();
-
-                ImGui::EndChild();
-
-                style.ItemSpacing = itemSpacingSave;
-                style.WindowPadding = windowPaddingSave;
-                style.ChildBorderSize = childBorderSizeSave;
-
-                if (!isContextMenuOpen) {
-                    auto p1 = p0;
-                    p1.x += mainSize.x;
-                    p1.y += mainSize.y;
-
-                    if (ImGui::IsMouseHoveringRect(p0, p1, true)) {
-                        if (ImGui::GetIO().MouseDownDuration[0] > tHoldContextPopup) {
-                            isHoldingDown = true;
-                        }
-                    }
-                }
-
-                if (ImGui::IsMouseReleased(0) && isHoldingDown) {
-                    auto pos = ImGui::GetMousePos();
-                    ImGui::SetNextWindowPos(pos);
-
-                    ImGui::OpenPopup("Message options");
-                    isHoldingDown = false;
-                    isContextMenuOpen = true;
-                }
-
-                if (ImGui::BeginPopup("Message options")) {
-                    ImGui::TextDisabled("Advanced settings");
-                    ImGui::Separator();
-                    ImGui::PushItemWidth(0.5*mainSize.x);
-                    static char buf[64];
-                    snprintf(buf, 64, "Bin: %3d, Freq: %5.1f Hz", binMin, 0.5*binMin*statsCurrent.sampleRateInp/nBins);
-                    ImGui::DragInt("##binMin", &binMin, 1, 0, binMax - 2, buf);
-                    snprintf(buf, 64, "Bin: %3d, Freq: %5.1f Hz", binMax, 0.5*binMax*statsCurrent.sampleRateInp/nBins);
-                    ImGui::DragInt("##binMax", &binMax, 1, binMin + 1, nBins, buf);
-                    ImGui::DragFloat("##intensityScale", &intensityScale, 1.0f, 1.0f, 1000.0f, "Intensity scale: %.1f", 1.2f);
-                    if (ImGui::BeginCombo("##colormap", ColorMap::kTypeString.at(colorMap))) {
-                        for (int i = 0; i < (int) ColorMap::kTypeString.size(); ++i) {
-                            const bool isSelected = (colorMap == i);
-                            if (ImGui::Selectable(ColorMap::kTypeString.at(ColorMap::Type(i)), isSelected)) {
-                                colorMap = ColorMap::Type(i);
-                            }
-
-                            if (isSelected) {
-                                ImGui::SetItemDefaultFocus();
-                            }
-                        }
-                        ImGui::EndCombo();
-                    }
-                    ImGui::DragFloat("##height", &rxDataHeight, 0.1f, 1.0f, 10.0f, "Rx height: %.1f", 1.0f);
-
-                    if (isFrequencyAuto) {
-                        frequencySelected_hz = statsCurrent.statistics.estimatedPitch_Hz;
-                    }
-                    if (ImGui::DragFloat("##frequency", &frequencySelected_hz, 1.0f, 200.0f, 1200.0f, "Frequency: %.1f Hz", 1.0f)) {
-                        isFrequencyAuto = false;
-                        g_buffer.inputUI.flags.newParametersDecode = true;
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Checkbox("Auto##frequency", &isFrequencyAuto)) {
-                        g_buffer.inputUI.flags.newParametersDecode = true;
-                    }
-
-                    if (isSpeedAuto) {
-                        speedSelected_wpm = statsCurrent.statistics.estimatedSpeed_wpm;
-                    }
-                    if (ImGui::DragFloat("##speed", &speedSelected_wpm, 1.0f, 5.0f, 55.0f, "Speed: %.0f wpm", 1.0f)) {
-                        isSpeedAuto = false;
-                        g_buffer.inputUI.flags.newParametersDecode = true;
-                    }
-                    ImGui::SameLine();
-                    if (ImGui::Checkbox("Auto##speed", &isSpeedAuto)) {
-                        g_buffer.inputUI.flags.newParametersDecode = true;
-                    }
-
-                    ImGui::Checkbox("Show signal", &showSignal);
-                    ImGui::Checkbox("Show stats", &showStats);
-                    ImGui::PopItemWidth();
-
-                    ImGui::EndPopup();
-                } else {
-                    isContextMenuOpen = false;
-                }
-
-                if (g_buffer.inputUI.flags.newParametersDecode) {
-                    g_buffer.inputUI.update = true;
-                    g_buffer.inputUI.parametersDecode.frequency_hz = isFrequencyAuto ? -1.0f : frequencySelected_hz;
-                    g_buffer.inputUI.parametersDecode.speed_wpm = isSpeedAuto ? -1.0f : speedSelected_wpm;
+                    sum += spectrogramCurrent[i][binMin + j];
                 }
             }
 
-            {
-                static bool isContextMenuOpen = false;
-                static bool isHoldingDown = false;
+            sum /= (nx*ny);
+            if (sum == 0.0) sum = 1.0;
 
-                const auto p0 = ImGui::GetCursorScreenPos();
-                const auto mainSize = ImGui::GetContentRegionAvail();
+            auto wSize = ImGui::GetContentRegionAvail();
+            wSize.x -= frequencyMarkerSize;
 
+            const float dx = wSize.x/nx;
+            const float dy = wSize.y/ny;
+
+            int nChildWindows = 0;
+            int nFreqPerChild = 32;
+            ImGui::PushID(nChildWindows++);
+            ImGui::BeginChild("Spectrogram", { wSize.x + frequencyMarkerSize, (nFreqPerChild + 1)*dy }, true);
+            auto drawList = ImGui::GetWindowDrawList();
+            auto drawList0 = ImGui::GetWindowDrawList();
+
+            for (int j = 0; j < ny; ++j) {
+                if (j > 0 && j % nFreqPerChild == 0) {
+                    ImGui::EndChild();
+                    ImGui::PopID();
+
+                    ImGui::PushID(nChildWindows++);
+                    ImGui::SetCursorScreenPos({ p0.x, p0.y + nFreqPerChild*int(j/nFreqPerChild)*dy });
+                    ImGui::BeginChild("Spectrogram", { wSize.x + frequencyMarkerSize, (nFreqPerChild + 1)*dy }, true);
+                    drawList = ImGui::GetWindowDrawList();
+                }
+
+                int k = binMin + j;
+                for (int i = 0; i < nx; ++i) {
+                    auto c0 = ImGui::ColorConvertFloat4ToU32(getColor(colorMap, spectrogramCurrent[i][k]/(intensityScale*sum)));
+                    drawList->AddRectFilled({ p0.x + i*dx, p0.y + j*dy }, { p0.x + i*dx + dx, p0.y + j*dy + dy }, c0);
+
+                    //auto c1 =               i < nx - 1 ? ImGui::ColorConvertFloat4ToU32(getColor(ColorMap::Ggew, spectrogramCurrent[i + 1][k]/(intensityScale*sum))) : c0;
+                    //auto c2 = i < nx - 1 && j < ny - 1 ? ImGui::ColorConvertFloat4ToU32(getColor(ColorMap::Ggew, spectrogramCurrent[i + 1][k + 1]/(intensityScale*sum))) : c0;
+                    //auto c3 =               j < ny - 1 ? ImGui::ColorConvertFloat4ToU32(getColor(ColorMap::Ggew, spectrogramCurrent[i][k + 1]/(intensityScale*sum))) : c0;
+                    //drawList->AddRectFilledMultiColor({ p0.x + i*dx, p0.y + j*dy }, { p0.x + i*dx + dx, p0.y + j*dy + dy }, c0, c1, c2, c3);
+                }
+
+                const auto & f = statsCurrent.statistics.estimatedPitch_Hz;
+                if (f >= k*df && f < (k + 1)*df) {
+                    drawList0->AddTriangleFilled({ p0.x + wSize.x,                  p0.y + j*dy + 0.5f*dy },
+                                                 { p0.x + wSize.x + frequencyMarkerSize, p0.y + j*dy + 0.5f*dy - 0.5f*frequencyMarkerSize },
+                                                 { p0.x + wSize.x + frequencyMarkerSize, p0.y + j*dy + 0.5f*dy + 0.5f*frequencyMarkerSize },
+                                                 ImGui::ColorConvertFloat4ToU32({ 1.0f, 1.0f, 0.0f, 1.0f }));
+                }
+            }
+
+            ImGui::EndChild();
+            ImGui::PopID();
+
+            ImGui::SetCursorScreenPos(p0);
+            ImGui::BeginChild("Stats", { wSize.x + frequencyMarkerSize, mainSize.y }, true);
+            if (showSignal) {
+                ImGui::SetCursorScreenPos({ p0.x, p0.y + wSize.y - signalHeight });
+                ImGui::PlotHistogram("##signal", signalFCurrent.data(), signalFCurrent.size(), 0, NULL, FLT_MAX, FLT_MAX, { wSize.x, signalHeight });
+                drawList->AddLine({ p0.x, p0.y + wSize.y - statsCurrent.statistics.signalThreshold*signalHeight },
+                                  { p0.x + wSize.x, p0.y + wSize.y - statsCurrent.statistics.signalThreshold*signalHeight },
+                                  ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.0f, 0.0f, 0.75f }));
+            }
+
+            if (showStats) {
+                ImGui::SetCursorScreenPos({ p0.x + 0.5f*itemSpacingSave.x, p0.y + wSize.y - statsHeight });
                 ImGui::PushFont(ImGui::GetIO().Fonts->Fonts.back());
-                ImGui::BeginChild("Rx:data", mainSize, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-                ImGui::PushTextWrapPos(ImGui::GetContentRegionAvailWidth());
-                ImGui::Text("%s", rxData.c_str());
-                ImGui::PopTextWrapPos();
-                ImGui::SetScrollY(ImGui::GetScrollMaxY() - style.ItemSpacing.y);
-
-                if (!isContextMenuOpen) {
-                    auto p1 = p0;
-                    p1.x += mainSize.x;
-                    p1.y += mainSize.y;
-
-                    if (ImGui::IsMouseHoveringRect(p0, p1, true)) {
-                        if (ImGui::GetIO().MouseDownDuration[0] > tHoldContextPopup) {
-                            isHoldingDown = true;
-                        }
-                    }
-                }
-
-                if (ImGui::IsMouseReleased(0) && isHoldingDown) {
-                    auto pos = ImGui::GetMousePos();
-                    pos.x -= 1.0f*ImGui::CalcTextSize("Clear | Copy").x;
-                    pos.y -= 1.0f*ImGui::GetTextLineHeightWithSpacing();
-                    ImGui::SetNextWindowPos(pos);
-
-                    ImGui::OpenPopup("Rx options");
-                    isHoldingDown = false;
-                    isContextMenuOpen = true;
-                }
-
-                if (ImGui::BeginPopup("Rx options")) {
-                    if (ImGui::ButtonDisablable("Clear", {}, false)) {
-                        rxData.clear();
-                        ImGui::CloseCurrentPopup();
-                    }
-
-                    ImGui::SameLine();
-                    if (ImGui::ButtonDisablable("Copy", {}, false)) {
-                        SDL_SetClipboardText(rxData.c_str());
-                        ImGui::CloseCurrentPopup();
-                    }
-
-                    ImGui::EndPopup();
-                } else {
-                    isContextMenuOpen = false;
-                }
-
-                ImGui::EndChild();
+                ImGui::TextColored({ 1.0f, 1.0f, 0.0f, 1.0f }, "F: %6.1f Hz | S: %2.0f WPM | FPS: %4.1f | R: %4.1f ms",
+                                   statsCurrent.statistics.estimatedPitch_Hz,
+                                   statsCurrent.statistics.estimatedSpeed_wpm,
+                                   ImGui::GetIO().Framerate,
+                                   tLastFrame
+                                  );
                 ImGui::PopFont();
+            }
+            ImGui::EndChild();
+
+            ImGui::EndChild();
+
+            style.ItemSpacing = itemSpacingSave;
+            style.WindowPadding = windowPaddingSave;
+            style.ChildBorderSize = childBorderSizeSave;
+
+            if (!isContextMenuOpen) {
+                auto p1 = p0;
+                p1.x += mainSize.x;
+                p1.y += mainSize.y;
+
+                if (ImGui::IsMouseHoveringRect(p0, p1, true)) {
+                    if (ImGui::GetIO().MouseDownDuration[0] > tHoldContextPopup) {
+                        isHoldingDown = true;
+                    }
+                }
+            }
+
+            if (ImGui::IsMouseReleased(0) && isHoldingDown) {
+                auto pos = ImGui::GetMousePos();
+                ImGui::SetNextWindowPos(pos);
+
+                ImGui::OpenPopup("Message options");
+                isHoldingDown = false;
+                isContextMenuOpen = true;
+            }
+
+            if (ImGui::BeginPopup("Message options")) {
+                ImGui::TextDisabled("Advanced settings");
+                ImGui::Separator();
+                ImGui::PushItemWidth(0.5*mainSize.x);
+
+                static char buf[64];
+
+                switch (windowId) {
+                    case WindowId::Settings: {} break;
+                    case WindowId::Rx:
+                        {
+                            snprintf(buf, 64, "Bin: %3d, Freq: %5.1f Hz", binMin, 0.5*binMin*statsCurrent.sampleRateInp/nBins);
+                            ImGui::DragInt("##binMin", &binMin, 1, 0, binMax - 2, buf);
+                            snprintf(buf, 64, "Bin: %3d, Freq: %5.1f Hz", binMax, 0.5*binMax*statsCurrent.sampleRateInp/nBins);
+                            ImGui::DragInt("##binMax", &binMax, 1, binMin + 1, nBins, buf);
+                            ImGui::DragFloat("##intensityScale", &intensityScale, 1.0f, 1.0f, 1000.0f, "Intensity scale: %.1f", 1.2f);
+                            if (ImGui::BeginCombo("##colormap", ColorMap::kTypeString.at(colorMap))) {
+                                for (int i = 0; i < (int) ColorMap::kTypeString.size(); ++i) {
+                                    const bool isSelected = (colorMap == i);
+                                    if (ImGui::Selectable(ColorMap::kTypeString.at(ColorMap::Type(i)), isSelected)) {
+                                        colorMap = ColorMap::Type(i);
+                                    }
+
+                                    if (isSelected) {
+                                        ImGui::SetItemDefaultFocus();
+                                    }
+                                }
+                                ImGui::EndCombo();
+                            }
+                            ImGui::DragFloat("##height", &rxDataHeight, 0.1f, 1.0f, 10.0f, "Rx height: %.1f", 1.0f);
+
+                            if (isFrequencyAuto) {
+                                frequencySelected_hz = statsCurrent.statistics.estimatedPitch_Hz;
+                            }
+                            if (ImGui::DragFloat("##frequency", &frequencySelected_hz, 1.0f, 200.0f, 1200.0f, "Frequency: %.1f Hz", 1.0f)) {
+                                isFrequencyAuto = false;
+                                g_buffer.inputUI.flags.newParametersDecode = true;
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Checkbox("Auto##frequency", &isFrequencyAuto)) {
+                                g_buffer.inputUI.flags.newParametersDecode = true;
+                            }
+
+                            if (isSpeedAuto) {
+                                speedSelected_wpm = statsCurrent.statistics.estimatedSpeed_wpm;
+                            }
+                            if (ImGui::DragFloat("##speed", &speedSelected_wpm, 1.0f, 5.0f, 55.0f, "Speed: %.0f wpm", 1.0f)) {
+                                isSpeedAuto = false;
+                                g_buffer.inputUI.flags.newParametersDecode = true;
+                            }
+                            ImGui::SameLine();
+                            if (ImGui::Checkbox("Auto##speed", &isSpeedAuto)) {
+                                g_buffer.inputUI.flags.newParametersDecode = true;
+                            }
+
+                            ImGui::Checkbox("Show signal", &showSignal);
+                            ImGui::Checkbox("Show stats", &showStats);
+                        } break;
+                    case WindowId::Tx:
+                        {
+                            snprintf(buf, 64, "Frequency: %5.1f Hz", txFrequency_hz);
+                            ImGui::DragFloat("##frequency", &txFrequency_hz, 1, 200, 1200, buf);
+                            snprintf(buf, 64, "Characters speed: %2d WPM", txSpeedCharacters_wpm);
+                            if (ImGui::DragInt("##speedCharacters", &txSpeedCharacters_wpm, 1, 5, 55, buf)) {
+                                txSpeedFarnsworth_wpm = txSpeedCharacters_wpm;
+                            }
+                            snprintf(buf, 64, "Fanrsworth speed: %2d WPM", txSpeedFarnsworth_wpm);
+                            ImGui::DragInt("##speedFarnsworth", &txSpeedFarnsworth_wpm, 1, 5, 55, buf);
+                            ImGui::Checkbox("Repeat", &txRepeat);
+                        } break;
+                }
+
+                ImGui::PopItemWidth();
+
+                ImGui::EndPopup();
+            } else {
+                isContextMenuOpen = false;
+            }
+
+            if (g_buffer.inputUI.flags.newParametersDecode) {
+                g_buffer.inputUI.update = true;
+                g_buffer.inputUI.parametersDecode.frequency_hz = isFrequencyAuto ? -1.0f : frequencySelected_hz;
+                g_buffer.inputUI.parametersDecode.speed_wpm = isSpeedAuto ? -1.0f : speedSelected_wpm;
+            }
+        }
+
+        if (windowId == WindowId::Rx) {
+            static bool isContextMenuOpen = false;
+            static bool isHoldingDown = false;
+
+            const auto p0 = ImGui::GetCursorScreenPos();
+            const auto mainSize = ImGui::GetContentRegionAvail();
+
+            ImGui::PushFont(ImGui::GetIO().Fonts->Fonts.back());
+            ImGui::BeginChild("Rx:data", mainSize, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+            ImGui::PushTextWrapPos(ImGui::GetContentRegionAvailWidth());
+            ImGui::Text("%s", rxData.c_str());
+            ImGui::PopTextWrapPos();
+            ImGui::SetScrollY(ImGui::GetScrollMaxY() - style.ItemSpacing.y);
+
+            if (!isContextMenuOpen) {
+                auto p1 = p0;
+                p1.x += mainSize.x;
+                p1.y += mainSize.y;
+
+                if (ImGui::IsMouseHoveringRect(p0, p1, true)) {
+                    if (ImGui::GetIO().MouseDownDuration[0] > tHoldContextPopup) {
+                        isHoldingDown = true;
+                    }
+                }
+            }
+
+            if (ImGui::IsMouseReleased(0) && isHoldingDown) {
+                auto pos = ImGui::GetMousePos();
+                pos.x -= 1.0f*ImGui::CalcTextSize("Clear | Copy").x;
+                pos.y -= 1.0f*ImGui::GetTextLineHeightWithSpacing();
+                ImGui::SetNextWindowPos(pos);
+
+                ImGui::OpenPopup("Rx options");
+                isHoldingDown = false;
+                isContextMenuOpen = true;
+            }
+
+            if (ImGui::BeginPopup("Rx options")) {
+                if (ImGui::ButtonDisablable("Clear", {}, false)) {
+                    rxData.clear();
+                    ImGui::CloseCurrentPopup();
+                }
+
+                ImGui::SameLine();
+                if (ImGui::ButtonDisablable("Copy", {}, false)) {
+                    SDL_SetClipboardText(rxData.c_str());
+                    ImGui::CloseCurrentPopup();
+                }
+
+                ImGui::EndPopup();
+            } else {
+                isContextMenuOpen = false;
+            }
+
+            ImGui::EndChild();
+            ImGui::PopFont();
+        }
+
+        if (windowId == WindowId::Tx) {
+            static bool isHoldingInput = false;
+            static std::string inputLast = "";
+
+            const auto p0 = ImGui::GetCursorScreenPos();
+            ImGui::SetCursorScreenPos({ p0.x, p0.y + 0.5f*ImGui::GetTextLineHeight() });
+
+            ImGui::TextDisabled("F: %5.1f Hz | S: %d/%d WPM | Repeat: %s",
+                                txFrequency_hz, txSpeedCharacters_wpm, txSpeedFarnsworth_wpm,
+                                (txRepeat ? "ON" : "OFF"));
+
+            if (doInputFocus) {
+                ImGui::SetKeyboardFocusHere();
+                doInputFocus = false;
+            }
+
+            doSendMessage = false;
+            {
+                auto pos0 = ImGui::GetCursorScreenPos();
+                ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize(sendButtonText).x - 2*style.ItemSpacing.x);
+                if (ImGui::InputText("##Messages:Input", inputBuf, kMaxInputSize, ImGuiInputTextFlags_EnterReturnsTrue)) {
+                    doSendMessage = true;
+                }
+                ImGui::PopItemWidth();
+
+                if (isTextInput == false && inputBuf[0] == 0) {
+                    auto drawList = ImGui::GetWindowDrawList();
+                    pos0.x += style.ItemInnerSpacing.x;
+                    pos0.y += 0.5*style.ItemInnerSpacing.y;
+                    static char tmp[128];
+                    snprintf(tmp, 128, "Type some text");
+                    drawList->AddText(pos0, ImGui::ColorConvertFloat4ToU32({0.0f, 0.6f, 0.4f, 1.0f}), tmp);
+                }
+            }
+
+            if (ImGui::IsItemActive() && isTextInput == false) {
+                SDL_StartTextInput();
+                isTextInput = true;
+                tStartInput = ImGui::GetTime();
+            }
+            bool requestStopTextInput = false;
+            if (ImGui::IsItemDeactivated()) {
+                requestStopTextInput = true;
+            }
+
+            if (isTextInput) {
+                if (ImGui::IsItemHovered() && ImGui::GetIO().MouseDownDuration[0] > tHoldContextPopup) {
+                    isHoldingInput = true;
+                }
+            }
+
+            if (ImGui::IsMouseReleased(0) && isHoldingInput) {
+                auto pos = ImGui::GetMousePos();
+                pos.x -= 2.0f*ImGui::CalcTextSize("Paste").x;
+                pos.y -= 1.0f*ImGui::GetTextLineHeightWithSpacing();
+                ImGui::SetNextWindowPos(pos);
+
+                ImGui::OpenPopup("Input options");
+                isHoldingInput = false;
+            }
+
+            if (ImGui::BeginPopup("Input options")) {
+                if (ImGui::Button("Paste")) {
+                    for (int i = 0; i < kMaxInputSize; ++i) inputBuf[i] = 0;
+                    strncpy(inputBuf, SDL_GetClipboardText(), kMaxInputSize - 1);
+                    ImGui::CloseCurrentPopup();
+                }
+
+                ImGui::EndPopup();
+            }
+
+            ImGui::SameLine();
+            {
+                auto posCur = ImGui::GetCursorScreenPos();
+                posCur.y -= ImGui::GetTextLineHeightWithSpacing();
+                ImGui::SetCursorScreenPos(posCur);
+            }
+            if ((ImGui::Button(sendButtonText, { 0, 2*ImGui::GetTextLineHeightWithSpacing() }) || doSendMessage)) {
+                if (inputBuf[0] == 0) {
+                    strncpy(inputBuf, inputLast.data(), kMaxInputSize - 1);
+                }
+                if (inputBuf[0] != 0) {
+                    inputLast = std::string(inputBuf);
+                    g_buffer.inputUI.update = true;
+                    //g_buffer.inputUI.flags.newMessage = true;
+                    //g_buffer.inputUI.message = { false, std::chrono::system_clock::now(), std::string(inputBuf), settings.protocolId, settings.volume, Message::Text };
+
+                    inputBuf[0] = 0;
+                    doInputFocus = true;
+                    scrollMessagesToBottom = true;
+                }
+            }
+            if (!ImGui::IsItemHovered() && requestStopTextInput) {
+                SDL_StopTextInput();
+                isTextInput = false;
+                tEndInput = ImGui::GetTime();
             }
         }
     }

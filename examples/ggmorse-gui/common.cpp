@@ -449,7 +449,7 @@ void renderMain() {
         float volume = 0.10f;
     };
 
-    static WindowId windowId = WindowId::Rx;
+    static WindowId windowId = WindowId::Tx;
     static WindowId windowIdLast = windowId;
     static SubWindowIdRx subWindowIdRx = SubWindowIdRx::Main;
 
@@ -693,7 +693,7 @@ void renderMain() {
             static int binMax = 1300.0f/df;
 
             static float intensityScale = 30.0f;
-            static float rxDataHeight = 3.0f;
+            static float rxDataHeight = 5.5f;
             static float statsHeight = ImGui::GetTextLineHeight();
             static float signalHeight = 3*statsHeight;
             static float frequencyMarkerSize = 0.5f*ImGui::CalcTextSize("A").x;
@@ -712,7 +712,7 @@ void renderMain() {
             const auto p0 = ImGui::GetCursorScreenPos();
             auto mainSize = ImGui::GetContentRegionAvail();
             mainSize.x += frequencyMarkerSize;
-            mainSize.y -= (windowId == WindowId::Rx ? rxDataHeight : 2.5f)*ImGui::GetTextLineHeightWithSpacing() + 2.0f*style.ItemSpacing.y;
+            mainSize.y -= rxDataHeight*ImGui::GetTextLineHeightWithSpacing() + 2.0f*style.ItemSpacing.y;
 
             auto itemSpacingSave = style.ItemSpacing;
             style.ItemSpacing.x = 0.0f;
@@ -838,15 +838,16 @@ void renderMain() {
             }
 
             if (ImGui::BeginPopup("Message options")) {
-                ImGui::TextDisabled("Advanced settings");
+                ImGui::TextDisabled("Rx settings");
                 ImGui::Separator();
                 ImGui::PushItemWidth(0.5*mainSize.x);
 
                 static char buf[64];
 
                 switch (windowId) {
-                    case WindowId::Settings: {} break;
+                    case WindowId::Settings:
                     case WindowId::Rx:
+                    case WindowId::Tx:
                         {
                             snprintf(buf, 64, "Bin: %3d, Freq: %5.1f Hz", binMin, 0.5*binMin*statsCurrent.sampleRateInp/nBins);
                             ImGui::DragInt("##binMin", &binMin, 1, 0, binMax - 2, buf);
@@ -866,24 +867,24 @@ void renderMain() {
                                 }
                                 ImGui::EndCombo();
                             }
-                            ImGui::DragFloat("##height", &rxDataHeight, 0.1f, 1.0f, 10.0f, "Rx height: %.1f", 1.0f);
+                            ImGui::DragFloat("##height", &rxDataHeight, 1.0f, 4.0f, 10.0f, "Rx height: %.1f", 1.0f);
 
                             if (isFrequencyAuto) {
                                 frequencySelected_hz = statsCurrent.statistics.estimatedPitch_Hz;
                             }
-                            if (ImGui::DragFloat("##frequency", &frequencySelected_hz, 1.0f, 200.0f, 1200.0f, "Frequency: %.1f Hz", 1.0f)) {
+                            if (ImGui::DragFloat("##rxFrequency", &frequencySelected_hz, 1.0f, 200.0f, 1200.0f, "Rx Frequency: %.1f Hz", 1.0f)) {
                                 isFrequencyAuto = false;
                                 g_buffer.inputUI.flags.newParametersDecode = true;
                             }
                             ImGui::SameLine();
-                            if (ImGui::Checkbox("Auto##frequency", &isFrequencyAuto)) {
+                            if (ImGui::Checkbox("Auto##rxFrequency", &isFrequencyAuto)) {
                                 g_buffer.inputUI.flags.newParametersDecode = true;
                             }
 
                             if (isSpeedAuto) {
                                 speedSelected_wpm = statsCurrent.statistics.estimatedSpeed_wpm;
                             }
-                            if (ImGui::DragFloat("##speed", &speedSelected_wpm, 1.0f, 5.0f, 55.0f, "Speed: %.0f wpm", 1.0f)) {
+                            if (ImGui::DragFloat("##speed", &speedSelected_wpm, 1.0f, 5.0f, 55.0f, "Rx Speed: %.0f wpm", 1.0f)) {
                                 isSpeedAuto = false;
                                 g_buffer.inputUI.flags.newParametersDecode = true;
                             }
@@ -894,11 +895,12 @@ void renderMain() {
 
                             ImGui::Checkbox("Show signal", &showSignal);
                             ImGui::Checkbox("Show stats", &showStats);
-                        } break;
-                    case WindowId::Tx:
-                        {
-                            snprintf(buf, 64, "Frequency: %5.1f Hz", txFrequency_hz);
-                            ImGui::DragFloat("##frequency", &txFrequency_hz, 1, 200, 1200, buf);
+
+                            ImGui::TextDisabled("Tx settings");
+                            ImGui::Separator();
+
+                            snprintf(buf, 64, "Tx Frequency: %5.1f Hz", txFrequency_hz);
+                            ImGui::DragFloat("##txFrequency", &txFrequency_hz, 1, 200, 1200, buf);
                             snprintf(buf, 64, "Characters speed: %2d WPM", txSpeedCharacters_wpm);
                             if (ImGui::DragInt("##speedCharacters", &txSpeedCharacters_wpm, 1, 5, 55, buf)) {
                                 txSpeedFarnsworth_wpm = txSpeedCharacters_wpm;
@@ -923,12 +925,15 @@ void renderMain() {
             }
         }
 
-        if (windowId == WindowId::Rx) {
+        if (true || windowId == WindowId::Rx) {
             static bool isContextMenuOpen = false;
             static bool isHoldingDown = false;
 
             const auto p0 = ImGui::GetCursorScreenPos();
-            const auto mainSize = ImGui::GetContentRegionAvail();
+            auto mainSize = ImGui::GetContentRegionAvail();
+            if (windowId == WindowId::Tx) {
+                mainSize.y -= 2.5*ImGui::GetTextLineHeightWithSpacing() + 2.0f*style.ItemSpacing.y;
+            }
 
             ImGui::PushFont(ImGui::GetIO().Fonts->Fonts.back());
             ImGui::BeginChild("Rx:data", mainSize, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);

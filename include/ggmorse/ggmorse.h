@@ -47,6 +47,8 @@ extern "C" {
     } ggmorse_ParametersDecode;
 
     typedef struct {
+        float volume;
+        float frequency_hz;
         float speedCharacters_wpm;
         float speedFarnsworth_wpm;
     } ggmorse_ParametersEncode;
@@ -79,6 +81,7 @@ public:
     static constexpr auto kMaxSamplesPerFrame = 2048;
     static constexpr auto kDefaultVolume = 10;
     static constexpr auto kMaxWindowToAnalyze_s = 3.0f;
+    static constexpr auto kMaxTxLength = 256;
 
     using Parameters        = ggmorse_Parameters;
     using ParametersDecode  = ggmorse_ParametersDecode;
@@ -102,7 +105,7 @@ public:
     static const ParametersDecode & getDefaultParametersDecode();
     static const ParametersEncode & getDefaultParametersEncode();
 
-    bool init(int dataSize, const char * dataBuffer, const int volume = kDefaultVolume);
+    bool init(int dataSize, const char * dataBuffer);
 
     bool setParametersDecode(const ParametersDecode & parameters);
     bool setParametersEncode(const ParametersEncode & parameters);

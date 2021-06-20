@@ -189,6 +189,12 @@ bool ButtonSelectable(const char* label, const ImVec2& size = ImVec2(0, 0), bool
 
 }
 
+struct Message {
+    std::chrono::system_clock::time_point timestamp;
+    std::string data;
+    GGMorse::ParametersEncode parameters;
+};
+
 struct GGMorseStats {
     int samplesPerFrame;
     float sampleRateInp;
@@ -255,6 +261,7 @@ struct Input {
     struct Flags {
         bool needReinit = false;
         bool newParametersDecode = false;
+        bool newMessage = false;
 
         void clear() { memset(this, 0, sizeof(Flags)); }
     } flags;
@@ -274,13 +281,24 @@ struct Input {
             dst.parametersDecode = std::move(this->parametersDecode);
         }
 
+        if (this->flags.newMessage) {
+            dst.update = true;
+            dst.flags.newMessage = true;
+            dst.message = std::move(this->message);
+        }
+
         flags.clear();
         update = false;
     }
 
     // reinit
     float sampleRateOffset = 0.0f;
+
+    // parametersDecode
     GGMorse::ParametersDecode parametersDecode;
+
+    // message
+    Message message;
 };
 
 struct Buffer {
@@ -346,6 +364,13 @@ void updateCore() {
 
         if (inputCurrent.flags.newParametersDecode) {
             ggMorse->setParametersDecode(inputCurrent.parametersDecode);
+        }
+
+        if (inputCurrent.flags.newMessage) {
+            ggMorse->setParametersEncode(inputCurrent.message.parameters);
+            ggMorse->init(
+                    (int) inputCurrent.message.data.size(),
+                    inputCurrent.message.data.data());
         }
 
         inputCurrent.flags.clear();
@@ -1040,8 +1065,8 @@ void renderMain() {
                 if (inputBuf[0] != 0) {
                     inputLast = std::string(inputBuf);
                     g_buffer.inputUI.update = true;
-                    //g_buffer.inputUI.flags.newMessage = true;
-                    //g_buffer.inputUI.message = { false, std::chrono::system_clock::now(), std::string(inputBuf), settings.protocolId, settings.volume, Message::Text };
+                    g_buffer.inputUI.flags.newMessage = true;
+                    g_buffer.inputUI.message = { std::chrono::system_clock::now(), std::string(inputBuf), { settings.volume, txFrequency_hz, (float) txSpeedCharacters_wpm, (float) txSpeedFarnsworth_wpm } };
 
                     inputBuf[0] = 0;
                     doInputFocus = true;

@@ -15,6 +15,17 @@
 
 namespace {
 
+float lendot_ms(float speed_wpm) {
+    return 60000.0f/(50.0f*speed_wpm);
+}
+
+char toUpper(char c) {
+    if (c >= 'a' && c <= 'z') return c -= 'a' - 'A';
+    return c;
+}
+
+// 0 - dot
+// 1 - dash
 const std::unordered_map<std::string, char> kMorseCode = {
     { "01",     'A', },
     { "1000",   'B', },
@@ -103,6 +114,7 @@ struct GGMorse::Impl {
 
     int samplesNeeded;
     int framesProcessed = 0;
+    int txDataLength = 0;
 
     bool hasNewTxData = false;
     bool hasNewWaveform = false;
@@ -124,7 +136,12 @@ struct GGMorse::Impl {
     Spectrogram spectrogram = Spectrogram(0);
 
     TxRx rxData = {};
+    TxRx txData = {};
     SignalF signalF = {};
+
+    TxRx outputBlockTmp = {};
+    WaveformF outputBlockF = {};
+    WaveformI16 outputBlockI16 = {};
 
     // todo : refactor
     std::vector<std::vector<std::vector<Interval>>> intervalsAll = {};
@@ -158,6 +175,7 @@ const GGMorse::ParametersDecode & GGMorse::getDefaultParametersDecode() {
 
 const GGMorse::ParametersEncode & GGMorse::getDefaultParametersEncode() {
     static ggmorse_ParametersEncode result {
+        10,
         550.0f,
         25.0f,
     };
@@ -202,19 +220,212 @@ GGMorse::~GGMorse() {
 }
 
 bool GGMorse::setParametersDecode(const ParametersDecode & parameters) {
+    // todo : validate parameters
+
     m_impl->parametersDecode = parameters;
 
     return true;
 }
 
 bool GGMorse::setParametersEncode(const ParametersEncode & parameters) {
+    // todo : validate parameters
+
+    if (parameters.volume < 0 || parameters.volume > 100) {
+        fprintf(stderr, "Invalid volume: %d\n", parameters.volume);
+        return false;
+    }
+
     m_impl->parametersEncode = parameters;
 
     return true;
 }
 
-bool GGMorse::encode(const CBWaveformOut & /*cbWaveformOut*/) {
-    // todo : to be implemented ..
+bool GGMorse::init(int dataSize, const char * dataBuffer) {
+    if (dataSize < 0) {
+        fprintf(stderr, "Negative data size: %d\n", dataSize);
+        return false;
+    }
+
+    if (dataSize > kMaxTxLength) {
+        fprintf(stderr, "Truncating data from %d to %d bytes\n", dataSize, kMaxTxLength);
+        dataSize = kMaxTxLength;
+    }
+
+    m_impl->txDataLength = dataSize;
+
+    const uint8_t * text = reinterpret_cast<const uint8_t *>(dataBuffer);
+
+    m_impl->hasNewTxData = false;
+    m_impl->txData.resize(m_impl->txDataLength);
+
+    if (m_impl->txDataLength > 0) {
+        for (int i = 0; i < m_impl->txDataLength; ++i) m_impl->txData[i] = text[i];
+
+        m_impl->hasNewTxData = true;
+    }
+
+    return true;
+}
+
+bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
+    if (m_impl->hasNewTxData == false) {
+        return false;
+    }
+
+    m_impl->hasNewTxData = false;
+
+    int nSamplesTotal = 0;
+
+    float lendot0_samples = m_impl->sampleRateOut*(1e-3*lendot_ms(m_impl->parametersEncode.speedCharacters_wpm));
+    float lendot1_samples = m_impl->sampleRateOut*(1e-3*lendot_ms(m_impl->parametersEncode.speedFarnsworth_wpm));
+
+    float lenLetterSpace_samples = 3.0f*lendot1_samples;
+    float lenWordSpace_samples = 7.0f*lendot1_samples;
+
+    // 0 - dot
+    // 1 - dash
+    // 2 - pause between symbols
+    // 3 - pause between letters
+    // 4 - pause between words
+    std::string symbols0;
+    std::string symbols1;
+
+    for (int i = 0; i < m_impl->txDataLength; ++i) {
+        bool found = false;
+        for (const auto & l : kMorseCode) {
+            if (l.second == toUpper(m_impl->txData[i])) {
+                for (int k = 0; k < (int) l.first.size(); ++k) {
+                    if (l.first[k] == '0') {
+                        nSamplesTotal += 1*lendot0_samples;
+                        symbols0 += "0";
+                        symbols1 += ".";
+                    }
+                    if (l.first[k] == '1') {
+                        nSamplesTotal += 3*lendot1_samples;
+                        symbols0 += "1";
+                        symbols1 += "-";
+                    }
+                    if (k < (int) l.first.size() - 1) {
+                        nSamplesTotal += 1*lendot1_samples;
+                        symbols0 += "2";
+                        symbols1 += "";
+                    }
+                }
+                found = true;
+                break;
+            }
+        }
+
+        if (i < m_impl->txDataLength - 1) {
+            if (m_impl->txData[i + 1] != ' ') {
+                nSamplesTotal += 3*lendot1_samples;
+                symbols0 += "3";
+                symbols1 += " ";
+            } else {
+                nSamplesTotal += 7*lendot1_samples;
+                symbols0 += "4";
+                symbols1 += " / ";
+            }
+        }
+    }
+
+    m_impl->outputBlockF.resize(nSamplesTotal);
+
+    int idx = 0;
+    const auto & volume = m_impl->parametersEncode.volume;
+    const auto & frequency_hz = m_impl->parametersEncode.frequency_hz;
+    for (const char & s : symbols0) {
+        if (s == '0') {
+            for (int i = 0; i < lendot0_samples; ++i) {
+                m_impl->outputBlockF[idx] = volume*std::sin((2.0*M_PI)*(idx*frequency_hz/kBaseSampleRate));
+                ++idx;
+            }
+        }
+        if (s == '1') {
+            for (int i = 0; i < 3*lendot0_samples; ++i) {
+                m_impl->outputBlockF[idx] = volume*std::sin((2.0*M_PI)*(idx*frequency_hz/kBaseSampleRate));
+                ++idx;
+            }
+        }
+        if (s == '2') {
+            for (int i = 0; i < lendot1_samples; ++i) {
+                m_impl->outputBlockF[idx] = 0.0f;
+                ++idx;
+            }
+        }
+        if (s == '3') {
+            for (int i = 0; i < 3*lendot1_samples; ++i) {
+                m_impl->outputBlockF[idx] = 0.0f;
+                ++idx;
+            }
+        }
+        if (s == '4') {
+            for (int i = 0; i < 7*lendot1_samples; ++i) {
+                m_impl->outputBlockF[idx] = 0.0f;
+                ++idx;
+            }
+        }
+    }
+
+    // convert from 32-bit float
+    m_impl->outputBlockTmp.resize(nSamplesTotal*m_impl->sampleSizeBytesOut);
+    switch (m_impl->sampleFormatOut) {
+        case GGMORSE_SAMPLE_FORMAT_UNDEFINED:
+            {
+                return false;
+            } break;
+        case GGMORSE_SAMPLE_FORMAT_U8:
+            {
+                auto p = reinterpret_cast<uint8_t *>(m_impl->outputBlockTmp.data());
+                for (int i = 0; i < nSamplesTotal; ++i) {
+                    p[i] = 128*(m_impl->outputBlockF[i] + 1.0f);
+                }
+            } break;
+        case GGMORSE_SAMPLE_FORMAT_I8:
+            {
+                auto p = reinterpret_cast<uint8_t *>(m_impl->outputBlockTmp.data());
+                for (int i = 0; i < nSamplesTotal; ++i) {
+                    p[i] = 128*m_impl->outputBlockF[i];
+                }
+            } break;
+        case GGMORSE_SAMPLE_FORMAT_U16:
+            {
+                auto p = reinterpret_cast<uint16_t *>(m_impl->outputBlockTmp.data());
+                for (int i = 0; i < nSamplesTotal; ++i) {
+                    p[i] = 32768*(m_impl->outputBlockF[i] + 1.0f);
+                }
+            } break;
+        case GGMORSE_SAMPLE_FORMAT_I16:
+            {
+                auto p = reinterpret_cast<uint16_t *>(m_impl->outputBlockTmp.data());
+                for (int i = 0; i < nSamplesTotal; ++i) {
+                    p[i] = 32768*m_impl->outputBlockF[i];
+                }
+            } break;
+        case GGMORSE_SAMPLE_FORMAT_F32:
+            {
+                auto p = reinterpret_cast<float *>(m_impl->outputBlockTmp.data());
+                for (int i = 0; i < nSamplesTotal; ++i) {
+                    p[i] = m_impl->outputBlockF[i];
+                }
+            } break;
+    }
+
+    // output generated data via the provided callback
+    switch (m_impl->sampleFormatOut) {
+        case GGMORSE_SAMPLE_FORMAT_UNDEFINED:
+            {
+                return false;
+            } break;
+        case GGMORSE_SAMPLE_FORMAT_U8:
+        case GGMORSE_SAMPLE_FORMAT_I8:
+        case GGMORSE_SAMPLE_FORMAT_I16:
+        case GGMORSE_SAMPLE_FORMAT_U16:
+        case GGMORSE_SAMPLE_FORMAT_F32:
+            {
+                cbWaveformOut(m_impl->outputBlockTmp.data(), nSamplesTotal*m_impl->sampleSizeBytesOut);
+            } break;
+    }
 
     return true;
 }
@@ -454,8 +665,7 @@ void GGMorse::decode_float() {
         int dl = (mode == 0) ? 20 : 2;
 
         for (int s = s0; s <= s1 && s < 55; s += ds) {
-            float lendot_ms = 60000.0f/(50.0f*(5 + s));
-            float lendot_samples = kBaseSampleRate*(1e-3*lendot_ms)/nDownsample;
+            float lendot_samples = kBaseSampleRate*(1e-3*lendot_ms(5 + s))/nDownsample;
 
             for (int l = l0; l <= l1; l += dl) {
                 float level = (0.01*mean)*l;

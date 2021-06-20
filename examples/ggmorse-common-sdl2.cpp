@@ -230,27 +230,15 @@ bool GGMorse_mainLoop() {
 
     if (g_ggMorse->hasTxData() == false) {
         SDL_PauseAudioDevice(g_devIdOut, SDL_FALSE);
-
-        static auto tLastNoData = std::chrono::high_resolution_clock::now();
-        auto tNow = std::chrono::high_resolution_clock::now();
-
-        if ((int) SDL_GetQueuedAudioSize(g_devIdOut) < g_ggMorse->getSamplesPerFrame()*g_ggMorse->getSampleSizeBytesOut()) {
-            SDL_PauseAudioDevice(g_devIdInp, SDL_FALSE);
-            if (::getTime_ms(tLastNoData, tNow) > 500.0f) {
-                g_ggMorse->decode(cbWaveformInp);
-                if ((int) SDL_GetQueuedAudioSize(g_devIdInp) > 32*g_ggMorse->getSamplesPerFrame()*g_ggMorse->getSampleSizeBytesInp()) {
-                    fprintf(stderr, "Warning: slow processing, clearing queued audio buffer of %d bytes ...", SDL_GetQueuedAudioSize(g_devIdInp));
-                    SDL_ClearQueuedAudio(g_devIdInp);
-                }
-            } else {
-                SDL_ClearQueuedAudio(g_devIdInp);
-            }
-        } else {
-            tLastNoData = tNow;
+        SDL_PauseAudioDevice(g_devIdInp, SDL_FALSE);
+        g_ggMorse->decode(cbWaveformInp);
+        if ((int) SDL_GetQueuedAudioSize(g_devIdInp) > 32*g_ggMorse->getSamplesPerFrame()*g_ggMorse->getSampleSizeBytesInp()) {
+            fprintf(stderr, "Warning: slow processing, clearing queued audio buffer of %d bytes ...", SDL_GetQueuedAudioSize(g_devIdInp));
+            SDL_ClearQueuedAudio(g_devIdInp);
         }
     } else {
         SDL_PauseAudioDevice(g_devIdOut, SDL_TRUE);
-        SDL_PauseAudioDevice(g_devIdInp, SDL_TRUE);
+        //SDL_PauseAudioDevice(g_devIdInp, SDL_TRUE);
 
         g_ggMorse->encode(cbWaveformOut);
     }

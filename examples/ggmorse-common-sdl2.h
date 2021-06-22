@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <memory>
 
 class GGMorse;
 
@@ -8,6 +9,6 @@ class GGMorse;
 
 void GGMorse_setDefaultCaptureDeviceName(std::string name);
 bool GGMorse_init(const int playbackId, const int captureId, const float sampleRateOffset = 0);
-GGMorse *& GGMorse_instance();
+std::shared_ptr<GGMorse> GGMorse_instance();
 bool GGMorse_mainLoop();
 bool GGMorse_deinit();

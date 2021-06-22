@@ -34,6 +34,18 @@
 
 namespace {
 
+void ImGui_TextCentered(const char * text, bool disabled) {
+    const auto w0 = ImGui::GetContentRegionAvailWidth();
+    const auto w1 = ImGui::CalcTextSize(text).x;
+    const auto p0 = ImGui::GetCursorScreenPos();
+    ImGui::SetCursorScreenPos({ p0.x + 0.5f*(w0 - w1), p0.y });
+    if (disabled) {
+        ImGui::TextDisabled("%s", text);
+    } else {
+        ImGui::Text("%s", text);
+    }
+}
+
 std::mutex g_mutex;
 char * toTimeString(const std::chrono::system_clock::time_point & tp) {
     std::lock_guard<std::mutex> lock(g_mutex);
@@ -259,7 +271,6 @@ struct Input {
     bool update = true;
 
     struct Flags {
-        bool needReinit = false;
         bool newParametersDecode = false;
         bool newMessage = false;
 
@@ -268,12 +279,6 @@ struct Input {
 
     void apply(Input & dst) {
         if (update == false) return;
-
-        if (this->flags.needReinit) {
-            dst.update = true;
-            dst.flags.needReinit = true;
-            dst.sampleRateOffset = std::move(this->sampleRateOffset);
-        }
 
         if (this->flags.newParametersDecode) {
             dst.update = true;
@@ -290,9 +295,6 @@ struct Input {
         flags.clear();
         update = false;
     }
-
-    // reinit
-    float sampleRateOffset = 0.0f;
 
     // parametersDecode
     GGMorse::ParametersDecode parametersDecode;
@@ -334,11 +336,15 @@ void updateCore() {
     static Input inputCurrent;
 
     static bool isFirstCall = true;
-    static auto & ggMorse = GGMorse_instance();
     static int rxDataLengthLast = 0;
     static GGMorse::TxRx rxDataLast;
     static int signalFLengthLast = 0;
     static GGMorse::SignalF signalFLast;
+
+    auto ggMorse = GGMorse_instance();
+    if (ggMorse == nullptr) {
+        return;
+    }
 
     {
         std::lock_guard<std::mutex> lock(g_buffer.mutex);
@@ -346,22 +352,6 @@ void updateCore() {
     }
 
     if (inputCurrent.update) {
-        if (inputCurrent.flags.needReinit) {
-            static auto sampleRateInpOld = ggMorse->getSampleRateInp();
-            static auto sampleRateOutOld = ggMorse->getSampleRateOut();
-            GGMorse::SampleFormat sampleFormatInpOld = ggMorse->getSampleFormatInp();
-            GGMorse::SampleFormat sampleFormatOutOld = ggMorse->getSampleFormatOut();
-
-            if (ggMorse) delete ggMorse;
-
-            ggMorse = new GGMorse({
-                sampleRateInpOld,
-                sampleRateOutOld + inputCurrent.sampleRateOffset,
-                GGMorse::kDefaultSamplesPerFrame,
-                sampleFormatInpOld,
-                sampleFormatOutOld});
-        }
-
         if (inputCurrent.flags.newParametersDecode) {
             ggMorse->setParametersDecode(inputCurrent.parametersDecode);
         }
@@ -445,7 +435,6 @@ void renderMain() {
 
     struct Settings {
         bool isSampleRateOffset = false;
-        float sampleRateOffset = -512.0f;
         float volume = 0.10f;
     };
 
@@ -549,35 +538,39 @@ void renderMain() {
                  ImGuiWindowFlags_NoResize |
                  ImGuiWindowFlags_NoSavedSettings);
 
-    ImGui::InvisibleButton("StatusBar", { ImGui::GetContentRegionAvailWidth(), statusBarHeight });
+    if (displaySize.x > displaySize.y) {
+        windowId = WindowId::Rx;
+    } else {
+        ImGui::InvisibleButton("StatusBar", { ImGui::GetContentRegionAvailWidth(), statusBarHeight });
 
-    if (ImGui::ButtonSelectable(ICON_FA_COGS, { menuButtonHeight, menuButtonHeight }, windowId == WindowId::Settings )) {
-        windowId = WindowId::Settings;
-    }
-    ImGui::SameLine();
-
-    {
-        auto posSave = ImGui::GetCursorScreenPos();
-        if (ImGui::ButtonSelectable(ICON_FA_MICROPHONE "  Rx", { 0.45f*ImGui::GetContentRegionAvailWidth(), menuButtonHeight }, windowId == WindowId::Rx)) {
-            windowId = WindowId::Rx;
+        if (ImGui::ButtonSelectable(ICON_FA_COGS, { menuButtonHeight, menuButtonHeight }, windowId == WindowId::Settings )) {
+            windowId = WindowId::Settings;
         }
-        auto radius = 0.3f*ImGui::GetTextLineHeight();
-        posSave.x += 2.0f*radius;
-        posSave.y += 2.0f*radius;
-        ImGui::GetWindowDrawList()->AddCircleFilled(posSave, radius, hasAudioCaptureData ? ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.0f, 1.0f }) : ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.0f, 0.0f, 1.0f }), 16);
-    }
-    ImGui::SameLine();
+        ImGui::SameLine();
 
-    {
-        auto posSave = ImGui::GetCursorScreenPos();
-        if (ImGui::ButtonSelectable(ICON_FA_HEADPHONES "  Tx", { 1.00f*ImGui::GetContentRegionAvailWidth(), menuButtonHeight }, windowId == WindowId::Tx)) {
-            windowId = WindowId::Tx;
+        {
+            auto posSave = ImGui::GetCursorScreenPos();
+            if (ImGui::ButtonSelectable(ICON_FA_MICROPHONE "  Rx", { 0.45f*ImGui::GetContentRegionAvailWidth(), menuButtonHeight }, windowId == WindowId::Rx)) {
+                windowId = WindowId::Rx;
+            }
+            auto radius = 0.3f*ImGui::GetTextLineHeight();
+            posSave.x += 2.0f*radius;
+            posSave.y += 2.0f*radius;
+            ImGui::GetWindowDrawList()->AddCircleFilled(posSave, radius, hasAudioCaptureData ? ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.0f, 1.0f }) : ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.0f, 0.0f, 1.0f }), 16);
         }
-        auto radius = 0.3f*ImGui::GetTextLineHeight();
-        posSave.x += 2.0f*radius;
-        posSave.y += 2.0f*radius;
-        if (hasNewMessages) {
-            ImGui::GetWindowDrawList()->AddCircleFilled(posSave, radius, ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.0f, 0.0f, 1.0f }), 16);
+        ImGui::SameLine();
+
+        {
+            auto posSave = ImGui::GetCursorScreenPos();
+            if (ImGui::ButtonSelectable(ICON_FA_HEADPHONES "  Tx", { 1.00f*ImGui::GetContentRegionAvailWidth(), menuButtonHeight }, windowId == WindowId::Tx)) {
+                windowId = WindowId::Tx;
+            }
+            auto radius = 0.3f*ImGui::GetTextLineHeight();
+            posSave.x += 2.0f*radius;
+            posSave.y += 2.0f*radius;
+            if (hasNewMessages) {
+                ImGui::GetWindowDrawList()->AddCircleFilled(posSave, radius, ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.0f, 0.0f, 1.0f }), 16);
+            }
         }
     }
 
@@ -587,7 +580,14 @@ void renderMain() {
 
     if (windowId == WindowId::Settings) {
         ImGui::BeginChild("Settings:main", ImGui::GetContentRegionAvail(), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-        ImGui::Text("GGMorse v0.1.0");
+        ImGui_TextCentered("GGMorse v1.0.0", false);
+        ImGui::PushFont(ImGui::GetIO().Fonts->Fonts.back());
+        ImGui::Text("%s", "");
+        ImGui_TextCentered("created by", true);
+        ImGui_TextCentered("  Georgi Gerganov, LZ2ZGJ", true);
+        ImGui_TextCentered("  Vladimir Gerganov, LZ2ZG", true);
+        ImGui::Text("%s", "");
+        ImGui::PopFont();
         ImGui::Separator();
 
         ImGui::Text("%s", "");
@@ -612,8 +612,9 @@ void renderMain() {
         }
         {
             auto posSave = ImGui::GetCursorScreenPos();
-            ImGui::Text("Volume: ");
+            ImGui::Text("Tx Volume: ");
             ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+
         }
         {
             auto p0 = ImGui::GetCursorScreenPos();
@@ -670,6 +671,7 @@ void renderMain() {
     }
 
     if (windowId != WindowId::Settings) {
+        static float rxDataHeight = 5.5f;
         static bool txRepeat = false;
         static float txFrequency_hz = 550.0f;
         static int txSpeedCharacters_wpm = 25;
@@ -688,7 +690,6 @@ void renderMain() {
                 static int binMax = 1300.0f/df;
 
                 static float intensityScale = 30.0f;
-                static float rxDataHeight = 5.5f;
                 static float statsHeight = ImGui::GetTextLineHeight();
                 static float signalHeight = 3*statsHeight;
                 static float frequencyMarkerSize = 0.5f*ImGui::CalcTextSize("A").x;
@@ -708,6 +709,16 @@ void renderMain() {
                 auto mainSize = ImGui::GetContentRegionAvail();
                 mainSize.x += frequencyMarkerSize;
                 mainSize.y -= rxDataHeight*ImGui::GetTextLineHeightWithSpacing() + 2.0f*style.ItemSpacing.y;
+
+#if defined(IOS) || defined(ANDROID)
+                if (displaySize.x < displaySize.y) {
+                    if (isTextInput) {
+                        mainSize.y -= 0.4f*displaySize.y*std::min(tShowKeyboard, ImGui::GetTime() - tStartInput) / tShowKeyboard;
+                    } else {
+                        mainSize.y -= 0.4f*displaySize.y - 0.4f*displaySize.y*std::min(tShowKeyboard, ImGui::GetTime() - tEndInput) / tShowKeyboard;
+                    }
+                }
+#endif
 
                 auto itemSpacingSave = style.ItemSpacing;
                 style.ItemSpacing.x = 0.0f;
@@ -848,7 +859,7 @@ void renderMain() {
                                 ImGui::DragInt("##binMin", &binMin, 1, 0, binMax - 2, buf);
                                 snprintf(buf, 64, "Bin: %3d, Freq: %5.1f Hz", binMax, 0.5*binMax*statsCurrent.sampleRateInp/nBins);
                                 ImGui::DragInt("##binMax", &binMax, 1, binMin + 1, nBins, buf);
-                                ImGui::DragFloat("##intensityScale", &intensityScale, 1.0f, 1.0f, 1000.0f, "Intensity scale: %.1f", 1.2f);
+                                ImGui::DragFloat("##intensityScale", &intensityScale, 1.0f, 1.0f, 1000.0f, "Intensity scale: %.1f");
                                 if (ImGui::BeginCombo("##colormap", ColorMap::kTypeString.at(colorMap))) {
                                     for (int i = 0; i < (int) ColorMap::kTypeString.size(); ++i) {
                                         const bool isSelected = (colorMap == i);
@@ -891,18 +902,20 @@ void renderMain() {
                                 ImGui::Checkbox("Show signal", &showSignal);
                                 ImGui::Checkbox("Show stats", &showStats);
 
-                                ImGui::TextDisabled("Tx settings");
-                                ImGui::Separator();
+                                if (displaySize.x < displaySize.y) {
+                                    ImGui::TextDisabled("Tx settings");
+                                    ImGui::Separator();
 
-                                snprintf(buf, 64, "Tx Frequency: %5.1f Hz", txFrequency_hz);
-                                ImGui::DragFloat("##txFrequency", &txFrequency_hz, 1, 200, 1200, buf);
-                                snprintf(buf, 64, "Characters speed: %2d WPM", txSpeedCharacters_wpm);
-                                if (ImGui::DragInt("##speedCharacters", &txSpeedCharacters_wpm, 1, 5, 55, buf)) {
-                                    txSpeedFarnsworth_wpm = txSpeedCharacters_wpm;
+                                    snprintf(buf, 64, "Tx Frequency: %5.1f Hz", txFrequency_hz);
+                                    ImGui::DragFloat("##txFrequency", &txFrequency_hz, 1, 200, 1200, buf);
+                                    snprintf(buf, 64, "Characters speed: %2d WPM", txSpeedCharacters_wpm);
+                                    if (ImGui::DragInt("##speedCharacters", &txSpeedCharacters_wpm, 1, 5, 55, buf)) {
+                                        txSpeedFarnsworth_wpm = txSpeedCharacters_wpm;
+                                    }
+                                    snprintf(buf, 64, "Fanrsworth speed: %2d WPM", txSpeedFarnsworth_wpm);
+                                    ImGui::DragInt("##speedFarnsworth", &txSpeedFarnsworth_wpm, 1, 5, 55, buf);
+                                    ImGui::Checkbox("Repeat", &txRepeat);
                                 }
-                                snprintf(buf, 64, "Fanrsworth speed: %2d WPM", txSpeedFarnsworth_wpm);
-                                ImGui::DragInt("##speedFarnsworth", &txSpeedFarnsworth_wpm, 1, 5, 55, buf);
-                                ImGui::Checkbox("Repeat", &txRepeat);
                             } break;
                     }
 
@@ -926,6 +939,7 @@ void renderMain() {
 
                 const auto p0 = ImGui::GetCursorScreenPos();
                 auto mainSize = ImGui::GetContentRegionAvail();
+                mainSize.y = rxDataHeight*ImGui::GetTextLineHeightWithSpacing();
                 if (windowId == WindowId::Tx) {
                     mainSize.y -= 2.5*ImGui::GetTextLineHeightWithSpacing() + 2.0f*style.ItemSpacing.y;
                 }

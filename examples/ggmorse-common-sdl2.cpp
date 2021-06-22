@@ -25,7 +25,7 @@ SDL_AudioDeviceID g_devIdOut = 0;
 SDL_AudioSpec g_obtainedSpecInp;
 SDL_AudioSpec g_obtainedSpecOut;
 
-GGMorse *g_ggMorse = nullptr;
+std::shared_ptr<GGMorse> g_ggMorse;
 
 }
 
@@ -200,9 +200,7 @@ bool GGMorse_init(
     }
 
     if (reinit) {
-        if (g_ggMorse) delete g_ggMorse;
-
-        g_ggMorse = new GGMorse({
+        g_ggMorse = std::make_shared<GGMorse>(GGMorse::Parameters {
             (float) g_obtainedSpecInp.freq,
             (float) g_obtainedSpecOut.freq,
             GGMorse::kDefaultSamplesPerFrame,
@@ -213,7 +211,7 @@ bool GGMorse_init(
     return true;
 }
 
-GGMorse *& GGMorse_instance() { return g_ggMorse; }
+std::shared_ptr<GGMorse> GGMorse_instance() { return g_ggMorse; }
 
 bool GGMorse_mainLoop() {
     if (g_devIdInp == 0 && g_devIdOut == 0) {
@@ -251,8 +249,7 @@ bool GGMorse_deinit() {
         return false;
     }
 
-    delete g_ggMorse;
-    g_ggMorse = nullptr;
+    g_ggMorse.reset();
 
     SDL_PauseAudioDevice(g_devIdInp, 1);
     SDL_CloseAudioDevice(g_devIdInp);

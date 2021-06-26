@@ -132,11 +132,8 @@ private:
     float a2;
     float b1;
     float b2;
-    float c0;
-    float d0;
-
+    
     float xnz1;
     float xnz2;
     float ynz1;
-    float ynz2;
 };

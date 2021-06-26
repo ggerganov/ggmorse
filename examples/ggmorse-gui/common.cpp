@@ -683,7 +683,7 @@ void renderMain() {
             ImGui::TextColored({ 1.0f, 0.0f, 0.0f, 1.0f }, "Please make sure you have allowed microphone access for this app.");
         } else {
             {
-                const int nBins = spectrogramCurrent[0].size()/2;
+                const int nBins = (int) spectrogramCurrent[0].size()/2;
                 const float df = 0.5*statsCurrent.sampleRateBase/nBins;
 
                 static int binMin = 180.0f/df;
@@ -733,7 +733,7 @@ void renderMain() {
 
                 ImGui::BeginChild("Rx:main", mainSize, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
-                const int nx = spectrogramCurrent.size();
+                const int nx = (int) spectrogramCurrent.size();
                 const int ny = binMax - binMin;
 
                 float sum = 0.0;
@@ -804,7 +804,7 @@ void renderMain() {
                 ImGui::BeginChild("Stats", { wSize.x + frequencyMarkerSize, mainSize.y }, true);
                 if (showSignal) {
                     ImGui::SetCursorScreenPos({ p0.x, p0.y + wSize.y - signalHeight });
-                    ImGui::PlotHistogram("##signal", signalFCurrent.data(), signalFCurrent.size(), 0, NULL, FLT_MAX, FLT_MAX, { wSize.x, signalHeight });
+                    ImGui::PlotHistogram("##signal", signalFCurrent.data(), (int) signalFCurrent.size(), 0, NULL, FLT_MAX, FLT_MAX, { wSize.x, signalHeight });
                     drawList->AddLine({ p0.x, p0.y + wSize.y - statsCurrent.statistics.signalThreshold*signalHeight },
                                       { p0.x + wSize.x, p0.y + wSize.y - statsCurrent.statistics.signalThreshold*signalHeight },
                                       ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.0f, 0.0f, 0.75f }));

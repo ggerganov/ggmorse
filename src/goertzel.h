@@ -27,9 +27,9 @@ struct GoertzelRunningFIR {
     }
 
     void process(float * samples, int n, float frequency_hz) {
-        int nw = m_hamming.size();
-        int nh = m_history.size();
-        int nf = m_filtered.size();
+        int nw = (int) m_hamming.size();
+        int nh = (int) m_history.size();
+        int nf = (int) m_filtered.size();
 
         float normalizedfreq = frequency_hz/m_sampleRate;
 
@@ -60,7 +60,7 @@ struct GoertzelRunningFIR {
     }
 
     const std::vector<float> & filtered() {
-        int nf = m_filtered.size();
+        int nf = (int) m_filtered.size();
 
         int j = m_filteredHead;
         for (int i = 0; i < nf; ++i) {
@@ -75,7 +75,7 @@ struct GoertzelRunningFIR {
     }
 
     const std::vector<float> & filtered_min(int w) {
-        int nf = m_filtered.size();
+        int nf = (int) m_filtered.size();
 
         int j = m_filteredHead;
         for (int i = 0; i < nf; ++i) {
@@ -111,7 +111,7 @@ private:
         double sprev2 = 0.0;
         double s, imag, real;
 
-        int n = m_hamming.size();
+        int n = (int) m_hamming.size();
         for (int i = 0; i < n; i++) {
             s = m_hamming[i]*m_history[idx++] + m_coeff*sprev - sprev2;
             if (idx >= (int) m_history.size()) idx = 0;

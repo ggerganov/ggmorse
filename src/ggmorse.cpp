@@ -638,7 +638,7 @@ void GGMorse::decode_float() {
     // noise below 200 Hz is eliminated
     //auto filteredF = m_impl->goertzelFilter.filtered_min(kBaseSampleRate/200.0f);
 
-    int nSamples = filteredF.size();
+    int nSamples = (int) filteredF.size();
     int windowToAnalyze_samples = kMaxWindowToAnalyze_s*kBaseSampleRate;
     int nFramesInWindow = windowToAnalyze_samples/m_impl->samplesPerFrame;
 
@@ -737,7 +737,7 @@ void GGMorse::decode_float() {
                 curInterval.end = nSamples;
                 intervals.push_back(curInterval);
 
-                int nIntervals = intervals.size();
+                int nIntervals = (int) intervals.size();
 
                 for (int i = 0; i < nIntervals; ++i) {
                     if (intervals[i].signal == 0) {
@@ -923,7 +923,7 @@ int GGMorse::takeRxData(TxRx & dst) {
 
     dst = std::move(m_impl->rxData);
 
-    return dst.size();
+    return (int) dst.size();
 }
 
 int GGMorse::takeSignalF(SignalF & dst) {
@@ -931,7 +931,7 @@ int GGMorse::takeSignalF(SignalF & dst) {
 
     dst = std::move(m_impl->signalF);
 
-    return dst.size();
+    return (int) dst.size();
 }
 
 const GGMorse::Statistics & GGMorse::getStatistics() const { return m_impl->statistics; }

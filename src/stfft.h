@@ -38,9 +38,9 @@ struct STFFT {
     }
 
     void process(float * samples, int n) {
-        int nw = m_hamming.size();
-        int nh = m_history.size();
-        int ns = m_spectrogram.size();
+        int nw = (int) m_hamming.size();
+        int nh = (int) m_history.size();
+        int ns = (int) m_spectrogram.size();
 
         for (int i = 0; i < n; ++i) {
             m_history[m_historyHead] = samples[i];
@@ -64,8 +64,8 @@ struct STFFT {
     }
 
     float pitch(float fMin_hz, float fMax_hz) {
-        int n = m_hamming.size();
-        int ns = m_spectrogram.size();
+        int n = (int) m_hamming.size();
+        int ns = (int) m_spectrogram.size();
         float maxSignal = 0.0f;
         float bestPitch = 0.0f;
         float df = float(m_sampleRate)/n;
@@ -98,8 +98,8 @@ struct STFFT {
     }
 
     const std::vector<std::vector<float>> & spectrogram() {
-        int n = m_hamming.size();
-        int ns = m_spectrogram.size();
+        int n = (int) m_hamming.size();
+        int ns = (int) m_spectrogram.size();
         int ih = m_spectrogramHead;
         for (int i = 0; i < ns; ++i) {
             for (int j = 0; j < n; ++j) {
@@ -118,7 +118,7 @@ private:
     void filter(int idx) {
         if (idx < 0) idx += m_history.size();
 
-        int n = m_hamming.size();
+        int n = (int) m_hamming.size();
         for (int i = 0; i < n; i++) {
             m_fft_buffer[2*i + 0] = m_hamming[i]*m_history[idx++];
             m_fft_buffer[2*i + 1] = 0.0f;

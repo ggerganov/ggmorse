@@ -684,7 +684,7 @@ void renderMain() {
         } else {
             {
                 const int nBins = spectrogramCurrent[0].size()/2;
-                const float df = 0.5*statsCurrent.sampleRateInp/nBins;
+                const float df = 0.5*statsCurrent.sampleRateBase/nBins;
 
                 static int binMin = 100.0f/df;
                 static int binMax = 1300.0f/df;
@@ -745,6 +745,8 @@ void renderMain() {
 
                 sum /= (nx*ny);
                 if (sum == 0.0) sum = 1.0;
+                const float iscale = 1.0f/(intensityScale*sum);
+                const auto c00 = ImGui::ColorConvertFloat4ToU32(getColor(colorMap, 0.0f));
 
                 auto wSize = ImGui::GetContentRegionAvail();
                 wSize.x -= frequencyMarkerSize;
@@ -772,7 +774,12 @@ void renderMain() {
 
                     int k = binMin + j;
                     for (int i = 0; i < nx; ++i) {
-                        auto c0 = ImGui::ColorConvertFloat4ToU32(getColor(colorMap, spectrogramCurrent[i][k]/(intensityScale*sum)));
+                        auto v = spectrogramCurrent[i][k]*iscale;
+                        auto c0 = c00;
+                        if (v > 0.05f) {
+                            c0 = ImGui::ColorConvertFloat4ToU32(getColor(colorMap, v));
+                        }
+                        //auto c0 = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.0f, v});
                         drawList->AddRectFilled({ p0.x + i*dx, p0.y + j*dy }, { p0.x + i*dx + dx, p0.y + j*dy + dy }, c0);
 
                         //auto c1 =               i < nx - 1 ? ImGui::ColorConvertFloat4ToU32(getColor(ColorMap::Ggew, spectrogramCurrent[i + 1][k]/(intensityScale*sum))) : c0;
@@ -855,9 +862,9 @@ void renderMain() {
                         case WindowId::Rx:
                         case WindowId::Tx:
                             {
-                                snprintf(buf, 64, "Bin: %3d, Freq: %5.1f Hz", binMin, 0.5*binMin*statsCurrent.sampleRateInp/nBins);
+                                snprintf(buf, 64, "Bin: %3d, Freq: %5.1f Hz", binMin, 0.5*binMin*statsCurrent.sampleRateBase/nBins);
                                 ImGui::DragInt("##binMin", &binMin, 1, 0, binMax - 2, buf);
-                                snprintf(buf, 64, "Bin: %3d, Freq: %5.1f Hz", binMax, 0.5*binMax*statsCurrent.sampleRateInp/nBins);
+                                snprintf(buf, 64, "Bin: %3d, Freq: %5.1f Hz", binMax, 0.5*binMax*statsCurrent.sampleRateBase/nBins);
                                 ImGui::DragInt("##binMax", &binMax, 1, binMin + 1, nBins, buf);
                                 ImGui::DragFloat("##intensityScale", &intensityScale, 1.0f, 1.0f, 1000.0f, "Intensity scale: %.1f");
                                 if (ImGui::BeginCombo("##colormap", ColorMap::kTypeString.at(colorMap))) {

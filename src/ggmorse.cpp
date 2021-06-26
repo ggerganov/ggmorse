@@ -5,6 +5,7 @@
 #include "goertzel.h"
 #include "resampler.h"
 
+#include <cassert>
 #include <chrono>
 #include <string>
 #include <unordered_map>
@@ -130,9 +131,9 @@ struct GGMorse::Impl {
     Interval lastInterval = {};
     std::string curLetter = "";
 
-    WaveformF waveform = WaveformF(kMaxSamplesPerFrame + 128);
-    WaveformF waveformResampled = WaveformF(kMaxSamplesPerFrame + 128);
-    TxRx waveformTmp = TxRx((kMaxSamplesPerFrame + 128)*sampleSizeBytesInp);
+    WaveformF waveform = WaveformF(2*kMaxSamplesPerFrame + 128);
+    WaveformF waveformResampled = WaveformF(2*kMaxSamplesPerFrame + 128);
+    TxRx waveformTmp = TxRx((2*kMaxSamplesPerFrame + 128)*sampleSizeBytesInp);
     Spectrogram spectrogram = Spectrogram(0);
 
     TxRx rxData = {};
@@ -337,13 +338,13 @@ bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
     for (const char & s : symbols0) {
         if (s == '0') {
             for (int i = 0; i < lendot0_samples; ++i) {
-                m_impl->outputBlockF[idx] = volume*std::sin((2.0*M_PI)*(idx*frequency_hz/kBaseSampleRate));
+                m_impl->outputBlockF[idx] = volume*std::sin((2.0*M_PI)*(idx*frequency_hz/m_impl->sampleRateOut));
                 ++idx;
             }
         }
         if (s == '1') {
             for (int i = 0; i < 3*lendot0_samples; ++i) {
-                m_impl->outputBlockF[idx] = volume*std::sin((2.0*M_PI)*(idx*frequency_hz/kBaseSampleRate));
+                m_impl->outputBlockF[idx] = volume*std::sin((2.0*M_PI)*(idx*frequency_hz/m_impl->sampleRateOut));
                 ++idx;
             }
         }
@@ -435,6 +436,10 @@ bool GGMorse::decode(const CBWaveformInp & cbWaveformInp) {
     while (m_impl->hasNewTxData == false) {
         auto tStart_us = t_us();
 
+        if (m_impl->samplesNeeded < m_impl->samplesPerFrame) {
+            m_impl->samplesNeeded += m_impl->samplesPerFrame;
+        }
+
         // read capture data
         float factor = m_impl->sampleRateInp/kBaseSampleRate;
         uint32_t nBytesNeeded = m_impl->samplesNeeded*m_impl->sampleSizeBytesInp;
@@ -462,6 +467,10 @@ bool GGMorse::decode(const CBWaveformInp & cbWaveformInp) {
                 {
                     nBytesRecorded = cbWaveformInp(m_impl->waveformResampled.data(), nBytesNeeded);
                 } break;
+        }
+
+        if (nBytesRecorded == 0) {
+            break;
         }
 
         if (nBytesRecorded % m_impl->sampleSizeBytesInp != 0) {
@@ -524,13 +533,12 @@ bool GGMorse::decode(const CBWaveformInp & cbWaveformInp) {
             case GGMORSE_SAMPLE_FORMAT_F32: break;
         }
 
-        //printf("recorded %d samples\n", nSamplesRecorded);
-
         if (nSamplesRecorded == 0) {
             break;
         }
 
-        uint32_t offset = m_impl->samplesPerFrame - m_impl->samplesNeeded;
+        uint32_t offset = m_impl->samplesPerFrame - (m_impl->samplesNeeded > m_impl->samplesPerFrame ? m_impl->samplesNeeded - m_impl->samplesPerFrame : m_impl->samplesNeeded);
+        //printf("samplesPerFrame = %d, samplesNeeded = %d, offset = %d\n", m_impl->samplesPerFrame, m_impl->samplesNeeded, offset);
 
         if (m_impl->sampleRateInp != kBaseSampleRate) {
             if (nSamplesRecorded <= 2*Resampler::kWidth) {
@@ -553,20 +561,25 @@ bool GGMorse::decode(const CBWaveformInp & cbWaveformInp) {
             }
         }
 
+        //printf("nSamplesRecorded = %d\n", nSamplesRecorded);
+
         // we have enough bytes to do analysis
         if (nSamplesRecorded >= m_impl->samplesPerFrame) {
-            m_impl->hasNewWaveform = true;
-            m_impl->statistics.timeResample_ms = dt_ms(tStart_us);
+            while (nSamplesRecorded >= m_impl->samplesPerFrame) {
+                m_impl->hasNewWaveform = true;
+                m_impl->statistics.timeResample_ms = dt_ms(tStart_us);
 
-            decode_float();
-            result = true;
+                decode_float();
+                result = true;
 
-            int nExtraSamples = nSamplesRecorded - m_impl->samplesPerFrame;
-            for (int i = 0; i < nExtraSamples; ++i) {
-                m_impl->waveform[i] = m_impl->waveform[m_impl->samplesPerFrame + i];
+                int nExtraSamples = nSamplesRecorded - m_impl->samplesPerFrame;
+                for (int i = 0; i < nExtraSamples; ++i) {
+                    m_impl->waveform[i] = m_impl->waveform[m_impl->samplesPerFrame + i];
+                }
+
+                m_impl->samplesNeeded = m_impl->samplesPerFrame - nExtraSamples;
+                nSamplesRecorded -= m_impl->samplesPerFrame;
             }
-
-            m_impl->samplesNeeded = m_impl->samplesPerFrame - nExtraSamples;
         } else {
             m_impl->samplesNeeded = m_impl->samplesPerFrame - nSamplesRecorded;
             break;

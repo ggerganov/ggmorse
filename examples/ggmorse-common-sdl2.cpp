@@ -65,8 +65,7 @@ void GGMorse_setDefaultCaptureDeviceName(std::string name) {
 
 bool GGMorse_init(
         const int playbackId,
-        const int captureId,
-        const float sampleRateOffset) {
+        const int captureId) {
 
     if (g_devIdInp && g_devIdOut) {
         return false;
@@ -106,10 +105,10 @@ bool GGMorse_init(
         SDL_AudioSpec playbackSpec;
         SDL_zero(playbackSpec);
 
-        playbackSpec.freq = GGMorse::kBaseSampleRate + sampleRateOffset;
+        playbackSpec.freq = 48000;
         playbackSpec.format = AUDIO_S16SYS;
         playbackSpec.channels = 1;
-        playbackSpec.samples = GGMorse::kDefaultSamplesPerFrame;
+        playbackSpec.samples = 1024;
         playbackSpec.callback = NULL;
 
         SDL_zero(g_obtainedSpecOut);
@@ -149,9 +148,9 @@ bool GGMorse_init(
     if (g_devIdInp == 0) {
         SDL_AudioSpec captureSpec;
         captureSpec = g_obtainedSpecOut;
-        captureSpec.freq = GGMorse::kBaseSampleRate + sampleRateOffset;
+        captureSpec.freq = 48000;
         captureSpec.format = AUDIO_F32SYS;
-        captureSpec.samples = GGMorse::kDefaultSamplesPerFrame;
+        captureSpec.samples = (captureSpec.freq/GGMorse::kBaseSampleRate)*GGMorse::kDefaultSamplesPerFrame;
 
         SDL_zero(g_obtainedSpecInp);
 
@@ -223,6 +222,9 @@ bool GGMorse_mainLoop() {
     };
 
     static GGMorse::CBWaveformInp cbWaveformInp = [&](void * data, uint32_t nMaxBytes) {
+        if (SDL_GetQueuedAudioSize(g_devIdInp) < nMaxBytes) {
+            return 0u;
+        }
         return SDL_DequeueAudio(g_devIdInp, data, nMaxBytes);
     };
 
@@ -231,7 +233,7 @@ bool GGMorse_mainLoop() {
         SDL_PauseAudioDevice(g_devIdInp, SDL_FALSE);
         g_ggMorse->decode(cbWaveformInp);
         if ((int) SDL_GetQueuedAudioSize(g_devIdInp) > 32*g_ggMorse->getSamplesPerFrame()*g_ggMorse->getSampleSizeBytesInp()) {
-            fprintf(stderr, "Warning: slow processing, clearing queued audio buffer of %d bytes ...", SDL_GetQueuedAudioSize(g_devIdInp));
+            fprintf(stderr, "Warning: slow processing, clearing queued audio buffer of %d bytes ...\n", SDL_GetQueuedAudioSize(g_devIdInp));
             SDL_ClearQueuedAudio(g_devIdInp);
         }
     } else {

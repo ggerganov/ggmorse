@@ -4,8 +4,6 @@
 
 // FFT routines taken from https://stackoverflow.com/a/37729648/4039976
 
-constexpr auto kMaxSamplesPerFrame = 1024;
-
 int log2(int N) {
     int k = N, i = 0;
     while(k) {
@@ -25,7 +23,7 @@ int reverse(int N, int n) {
 }
 
 void ordina(float * f1, int N) {
-    float f2[2*kMaxSamplesPerFrame];
+    float f2[2*N];
     for (int i = 0; i < N; i++) {
         int ir = reverse(N, i);
         f2[2*i + 0] = f1[2*ir + 0];

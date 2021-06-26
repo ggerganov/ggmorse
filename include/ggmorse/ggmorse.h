@@ -76,8 +76,8 @@ extern "C" {
 
 class GGMorse {
 public:
-    static constexpr auto kBaseSampleRate = 8000.0f;
-    static constexpr auto kDefaultSamplesPerFrame = 512;
+    static constexpr auto kBaseSampleRate = 4000.0f;
+    static constexpr auto kDefaultSamplesPerFrame = 128;
     static constexpr auto kMaxSamplesPerFrame = 2048;
     static constexpr auto kDefaultVolume = 10;
     static constexpr auto kMaxWindowToAnalyze_s = 3.0f;

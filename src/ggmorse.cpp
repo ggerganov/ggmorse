@@ -178,6 +178,7 @@ const GGMorse::ParametersEncode & GGMorse::getDefaultParametersEncode() {
         10,
         550.0f,
         25.0f,
+        25.0f,
     };
 
     return result;
@@ -230,8 +231,8 @@ bool GGMorse::setParametersDecode(const ParametersDecode & parameters) {
 bool GGMorse::setParametersEncode(const ParametersEncode & parameters) {
     // todo : validate parameters
 
-    if (parameters.volume < 0 || parameters.volume > 100) {
-        fprintf(stderr, "Invalid volume: %d\n", parameters.volume);
+    if (parameters.volume < 0.0f || parameters.volume > 1.0f) {
+        fprintf(stderr, "Invalid volume: %g\n", parameters.volume);
         return false;
     }
 
@@ -291,7 +292,6 @@ bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
     std::string symbols1;
 
     for (int i = 0; i < m_impl->txDataLength; ++i) {
-        bool found = false;
         for (const auto & l : kMorseCode) {
             if (l.second == toUpper(m_impl->txData[i])) {
                 for (int k = 0; k < (int) l.first.size(); ++k) {
@@ -301,28 +301,27 @@ bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
                         symbols1 += ".";
                     }
                     if (l.first[k] == '1') {
-                        nSamplesTotal += 3*lendot1_samples;
+                        nSamplesTotal += 3*lendot0_samples;
                         symbols0 += "1";
                         symbols1 += "-";
                     }
                     if (k < (int) l.first.size() - 1) {
-                        nSamplesTotal += 1*lendot1_samples;
+                        nSamplesTotal += lendot1_samples;
                         symbols0 += "2";
                         symbols1 += "";
                     }
                 }
-                found = true;
                 break;
             }
         }
 
         if (i < m_impl->txDataLength - 1) {
             if (m_impl->txData[i + 1] != ' ') {
-                nSamplesTotal += 3*lendot1_samples;
+                nSamplesTotal += lenLetterSpace_samples;
                 symbols0 += "3";
                 symbols1 += " ";
             } else {
-                nSamplesTotal += 7*lendot1_samples;
+                nSamplesTotal += lenWordSpace_samples;
                 symbols0 += "4";
                 symbols1 += " / ";
             }
@@ -354,13 +353,13 @@ bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
             }
         }
         if (s == '3') {
-            for (int i = 0; i < 3*lendot1_samples; ++i) {
+            for (int i = 0; i < lenLetterSpace_samples; ++i) {
                 m_impl->outputBlockF[idx] = 0.0f;
                 ++idx;
             }
         }
         if (s == '4') {
-            for (int i = 0; i < 7*lendot1_samples; ++i) {
+            for (int i = 0; i < lenWordSpace_samples; ++i) {
                 m_impl->outputBlockF[idx] = 0.0f;
                 ++idx;
             }
@@ -444,11 +443,10 @@ bool GGMorse::decode(const CBWaveformInp & cbWaveformInp) {
         uint32_t nBytesNeeded = m_impl->samplesNeeded*m_impl->sampleSizeBytesInp;
 
         if (m_impl->sampleRateInp != kBaseSampleRate) {
-            // note : predict 4 extra samples just to make sure we have enough data
             nBytesNeeded = (m_impl->resampler.resample(1.0f/factor,
                                                        m_impl->samplesNeeded,
                                                        m_impl->waveformResampled.data(),
-                                                       nullptr) + 4)*m_impl->sampleSizeBytesInp;
+                                                       nullptr))*m_impl->sampleSizeBytesInp;
         }
 
         uint32_t nBytesRecorded = 0;
@@ -537,7 +535,6 @@ bool GGMorse::decode(const CBWaveformInp & cbWaveformInp) {
         }
 
         uint32_t offset = m_impl->samplesNeeded > m_impl->samplesPerFrame ? 2*m_impl->samplesPerFrame - m_impl->samplesNeeded : 0;
-        //printf("samplesPerFrame = %d, samplesNeeded = %d, offset = %d\n", m_impl->samplesPerFrame, m_impl->samplesNeeded, offset);
 
         if (m_impl->sampleRateInp != kBaseSampleRate) {
             if (nSamplesRecorded <= 2*Resampler::kWidth) {
@@ -560,13 +557,12 @@ bool GGMorse::decode(const CBWaveformInp & cbWaveformInp) {
             }
         }
 
-        //printf("nSamplesRecorded = %d\n", nSamplesRecorded);
-
         // we have enough bytes to do analysis
         if (nSamplesRecorded >= m_impl->samplesPerFrame) {
+            m_impl->statistics.timeResample_ms = dt_ms(tStart_us);
+
             while (nSamplesRecorded >= m_impl->samplesPerFrame) {
                 m_impl->hasNewWaveform = true;
-                m_impl->statistics.timeResample_ms = dt_ms(tStart_us);
 
                 decode_float();
                 result = true;

@@ -18,7 +18,9 @@ struct Filter {
     enum EType {
         None = 0,
         FirstOrderHighPass,
+        FirstOrderLowPass,
         SecondOrderButterworthHighPass,
+        SecondOrderButterworthLowPass,
     };
 
     void init(EType type, float freqCutoff_Hz, float sampleRate) {
@@ -33,9 +35,19 @@ struct Filter {
                     calculateCoefficientsFirstOrderHighPass(freqCutoff_Hz, sampleRate);
                 }
                 break;
+            case EType::FirstOrderLowPass:
+                {
+                    calculateCoefficientsFirstOrderLowPass(freqCutoff_Hz, sampleRate);
+                }
+                break;
             case EType::SecondOrderButterworthHighPass:
                 {
                     calculateCoefficientsSecondOrderButterworthHighPass(freqCutoff_Hz, sampleRate);
+                }
+                break;
+            case EType::SecondOrderButterworthLowPass:
+                {
+                    calculateCoefficientsSecondOrderButterworthLowPass(freqCutoff_Hz, sampleRate);
                 }
                 break;
         };
@@ -48,16 +60,12 @@ struct Filter {
                 }
                 break;
             case EType::FirstOrderHighPass:
-                {
-                    for (int i = 0; i < n; ++i) {
-                        samples[i] = filterFirstOrderHighPass(samples[i]);
-                    }
-                }
-                break;
+            case EType::FirstOrderLowPass:
             case EType::SecondOrderButterworthHighPass:
+            case EType::SecondOrderButterworthLowPass:
                 {
                     for (int i = 0; i < n; ++i) {
-                        samples[i] = filterSecondOrderButterworthHighPass(samples[i]);
+                        samples[i] = filterBiquad(samples[i]);
                     }
                 }
                 break;
@@ -75,6 +83,16 @@ private:
         this->b2 = 0.0;
     }
 
+    void calculateCoefficientsFirstOrderLowPass(int fc, int fs) {
+        float th = 2.0 * pi * fc / fs;
+        float g = cos(th) / (1.0 + sin(th));
+        this->a0 = (1.0 - g) / 2.0;
+        this->a1 = (1.0 - g) / 2.0;
+        this->a2 = 0.0;
+        this->b1 = -g;
+        this->b2 = 0.0;
+    }
+
     void calculateCoefficientsSecondOrderButterworthHighPass(int fc, int fs) {
         float c = tan(pi*fc / fs);
         this->a0 = 1.0 / (1.0 + sqrt2*c + pow(c, 2.0));
@@ -84,21 +102,16 @@ private:
         this->b2 = this->a0 * (1.0 - sqrt2*c + pow(c, 2.0));
     }
 
-    float filterFirstOrderHighPass(float sample) {
-        float xn = sample;
-        float yn =
-            this->a0*xn + this->a1*this->xnz1 + this->a2*this->xnz2 -
-            this->b1*this->ynz1 - this->b2*this->xnz2;
-
-        this->xnz2 = this->xnz1;
-        this->xnz1 = xn;
-        this->xnz2 = this->ynz1;
-        this->ynz1 = yn;
-
-        return yn;
+    void calculateCoefficientsSecondOrderButterworthLowPass(int fc, int fs) {
+        float c = 1.0 / tan(pi*fc / fs);
+        this->a0 = 1.0 / (1.0 + sqrt2*c + pow(c, 2.0));
+        this->a1 = 2.0 * this->a0;
+        this->a2 = this->a0;
+        this->b1 = 2.0 * this->a0*(1.0 - pow(c, 2.0));
+        this->b2 = this->a0 * (1.0 - sqrt2*c + pow(c, 2.0));
     }
 
-    float filterSecondOrderButterworthHighPass(float sample) {
+    float filterBiquad(float sample) {
         float xn = sample;
         float yn =
             this->a0*xn + this->a1*this->xnz1 + this->a2*this->xnz2 -

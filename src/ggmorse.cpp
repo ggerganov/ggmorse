@@ -147,7 +147,8 @@ struct GGMorse::Impl {
     std::vector<std::vector<std::vector<Interval>>> intervalsAll = {};
 
     STFFT stfft = {};
-    Filter filter = {};
+    Filter filterHighPass200Hz = {};
+    Filter filterLowPass2kHz = {};
     Resampler resampler = {};
     GoertzelRunningFIR goertzelFilter = {};
 };
@@ -213,7 +214,8 @@ GGMorse::GGMorse(const Parameters & parameters)
     while (pow2For50Hz < kBaseSampleRate/50) pow2For50Hz *= 2;
 
     m_impl->stfft.init(kBaseSampleRate, pow2For10Hz, parameters.samplesPerFrame, kMaxWindowToAnalyze_s);
-    m_impl->filter.init(Filter::FirstOrderHighPass, 200.0f, kBaseSampleRate);
+    m_impl->filterHighPass200Hz.init(Filter::FirstOrderHighPass, 200.0f, kBaseSampleRate);
+    m_impl->filterLowPass2kHz.init(Filter::FirstOrderLowPass, 2000.0f, parameters.sampleRateInp);
     m_impl->goertzelFilter.init(kBaseSampleRate, pow2For50Hz, kMaxWindowToAnalyze_s);
 }
 
@@ -432,21 +434,27 @@ bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
 bool GGMorse::decode(const CBWaveformInp & cbWaveformInp) {
     bool result = false;
     while (m_impl->hasNewTxData == false) {
-        auto tStart_us = t_us();
+        const auto tStart_us = t_us();
 
         if (m_impl->samplesNeeded < m_impl->samplesPerFrame) {
             m_impl->samplesNeeded += m_impl->samplesPerFrame;
         }
 
         // read capture data
-        float factor = m_impl->sampleRateInp/kBaseSampleRate;
+        const float factor = m_impl->sampleRateInp/kBaseSampleRate;
         uint32_t nBytesNeeded = m_impl->samplesNeeded*m_impl->sampleSizeBytesInp;
 
+        bool resampleSimple = false;
         if (m_impl->sampleRateInp != kBaseSampleRate) {
-            nBytesNeeded = (m_impl->resampler.resample(1.0f/factor,
-                                                       m_impl->samplesNeeded,
-                                                       m_impl->waveformResampled.data(),
-                                                       nullptr))*m_impl->sampleSizeBytesInp;
+            if (int(m_impl->sampleRateInp) % int(kBaseSampleRate) == 0) {
+                nBytesNeeded *= factor;
+                resampleSimple = true;
+            } else {
+                nBytesNeeded = (m_impl->resampler.resample(1.0f/factor,
+                                                           m_impl->samplesNeeded,
+                                                           m_impl->waveformResampled.data(),
+                                                           nullptr))*m_impl->sampleSizeBytesInp;
+            }
         }
 
         uint32_t nBytesRecorded = 0;
@@ -537,20 +545,32 @@ bool GGMorse::decode(const CBWaveformInp & cbWaveformInp) {
         uint32_t offset = m_impl->samplesNeeded > m_impl->samplesPerFrame ? 2*m_impl->samplesPerFrame - m_impl->samplesNeeded : 0;
 
         if (m_impl->sampleRateInp != kBaseSampleRate) {
-            if (nSamplesRecorded <= 2*Resampler::kWidth) {
-                fprintf(stderr, "Failure to resample data - provided samples (%d) are less than the allowed minimum (%d)\n",
-                        nSamplesRecorded, 2*Resampler::kWidth);
-                m_impl->samplesNeeded = m_impl->samplesPerFrame;
-                break;
-            }
+            if (resampleSimple) {
+                m_impl->filterLowPass2kHz.process(m_impl->waveformResampled.data(), nSamplesRecorded);
 
-            // reset resampler state every minute
-            if (!m_impl->receivingData && m_impl->resampler.nSamplesTotal() > 60.0f*factor*kBaseSampleRate) {
-                m_impl->resampler.reset();
-            }
+                int ds = int(factor);
+                int nSamplesResampled = 0;
+                for (int i = 0; i < nSamplesRecorded; i += ds) {
+                    m_impl->waveform[offset + nSamplesResampled] = m_impl->waveformResampled[i];
+                    ++nSamplesResampled;
+                }
+                nSamplesRecorded = offset + nSamplesResampled;
+            } else {
+                if (nSamplesRecorded <= 2*Resampler::kWidth) {
+                    fprintf(stderr, "Failure to resample data - provided samples (%d) are less than the allowed minimum (%d)\n",
+                            nSamplesRecorded, 2*Resampler::kWidth);
+                    m_impl->samplesNeeded = m_impl->samplesPerFrame;
+                    break;
+                }
 
-            int nSamplesResampled = offset + m_impl->resampler.resample(factor, nSamplesRecorded, m_impl->waveformResampled.data(), m_impl->waveform.data() + offset);
-            nSamplesRecorded = nSamplesResampled;
+                // reset resampler state every minute
+                if (!m_impl->receivingData && m_impl->resampler.nSamplesTotal() > 60.0f*factor*kBaseSampleRate) {
+                    m_impl->resampler.reset();
+                }
+
+                int nSamplesResampled = m_impl->resampler.resample(factor, nSamplesRecorded, m_impl->waveformResampled.data(), m_impl->waveform.data() + offset);
+                nSamplesRecorded = offset + nSamplesResampled;
+            }
         } else {
             for (int i = 0; i < nSamplesRecorded; ++i) {
                 m_impl->waveform[offset + i] = m_impl->waveformResampled[i];
@@ -589,7 +609,7 @@ bool GGMorse::decode(const CBWaveformInp & cbWaveformInp) {
 void GGMorse::decode_float() {
     auto tStart_us = t_us();
 
-    m_impl->filter.process(m_impl->waveform.data(), m_impl->samplesPerFrame);
+    m_impl->filterHighPass200Hz.process(m_impl->waveform.data(), m_impl->samplesPerFrame);
     m_impl->stfft.process(m_impl->waveform.data(), m_impl->samplesPerFrame);
 
     auto frequency_hz = m_impl->parametersDecode.frequency_hz;

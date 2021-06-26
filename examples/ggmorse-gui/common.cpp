@@ -686,7 +686,7 @@ void renderMain() {
                 const int nBins = spectrogramCurrent[0].size()/2;
                 const float df = 0.5*statsCurrent.sampleRateBase/nBins;
 
-                static int binMin = 100.0f/df;
+                static int binMin = 180.0f/df;
                 static int binMax = 1300.0f/df;
 
                 static float intensityScale = 30.0f;

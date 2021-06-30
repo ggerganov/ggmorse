@@ -115,6 +115,7 @@ struct GGMorse::Impl {
     int samplesNeeded;
     int framesProcessed = 0;
     int txDataLength = 0;
+    int nFramesWithCurSpeed = 0;
 
     bool hasNewTxData = false;
     bool hasNewWaveform = false;
@@ -280,11 +281,11 @@ bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
 
     int nSamplesTotal = 0;
 
-    float lendot0_samples = m_impl->sampleRateOut*(1e-3*lendot_ms(m_impl->parametersEncode.speedCharacters_wpm));
-    float lendot1_samples = m_impl->sampleRateOut*(1e-3*lendot_ms(m_impl->parametersEncode.speedFarnsworth_wpm));
+    int lendot0_samples = m_impl->sampleRateOut*(1e-3*lendot_ms(m_impl->parametersEncode.speedCharacters_wpm));
+    int lendot1_samples = m_impl->sampleRateOut*(1e-3*lendot_ms(m_impl->parametersEncode.speedFarnsworth_wpm));
 
-    float lenLetterSpace_samples = 3.0f*lendot1_samples;
-    float lenWordSpace_samples = 7.0f*lendot1_samples;
+    int lenLetterSpace_samples = 3.0f*lendot1_samples;
+    int lenWordSpace_samples = 7.0f*lendot1_samples;
 
     // 0 - dot
     // 1 - dash
@@ -319,14 +320,16 @@ bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
         }
 
         if (i < m_impl->txDataLength - 1) {
-            if (m_impl->txData[i + 1] != ' ') {
-                nSamplesTotal += lenLetterSpace_samples;
-                symbols0 += "3";
-                symbols1 += " ";
-            } else {
-                nSamplesTotal += lenWordSpace_samples;
-                symbols0 += "4";
-                symbols1 += " / ";
+            if (m_impl->txData[i] != ' ') {
+                if (m_impl->txData[i + 1] != ' ') {
+                    nSamplesTotal += lenLetterSpace_samples;
+                    symbols0 += "3";
+                    symbols1 += " ";
+                } else {
+                    nSamplesTotal += lenWordSpace_samples;
+                    symbols0 += "4";
+                    symbols1 += " / ";
+                }
             }
         }
     }
@@ -886,41 +889,62 @@ void GGMorse::decode_float() {
     {
         const auto & intervals = m_impl->intervalsAll[bestSpeedIdx][bestLevelIdx];
 
-        m_impl->statistics.estimatedSpeed_wpm = 5 + bestSpeedIdx;
+        const float estimatedSpeed_wpm = 5 + bestSpeedIdx;
+        if (std::fabs(m_impl->statistics.estimatedSpeed_wpm - estimatedSpeed_wpm) > 2.0f) {
+            m_impl->nFramesWithCurSpeed = 0;
+        }
+        m_impl->statistics.estimatedSpeed_wpm = estimatedSpeed_wpm;
+        ++m_impl->nFramesWithCurSpeed;
+
         m_impl->statistics.signalThreshold = 0.01*bestLevelIdx;
 
+        int w0 = (2*nFramesInWindow/6);
+        int w1 = (2*nFramesInWindow/6);
+
+        if (estimatedSpeed_wpm >= 15.0f) {
+            if (m_impl->nFramesWithCurSpeed == nFramesInWindow) {
+                w1 = (5*nFramesInWindow)/6;
+            }
+            if (m_impl->nFramesWithCurSpeed > nFramesInWindow) {
+                w0 = (5*nFramesInWindow)/6;
+                w1 = (5*nFramesInWindow)/6;
+            }
+        }
+
         int j = 0;
-        for (int i = 0; i < m_impl->samplesPerFrame/nDownsample; ++i) {
-            int s = (nFramesInWindow/2)*m_impl->samplesPerFrame/nDownsample + i;
+        for (int w = w0; w <= w1; ++w) {
+            for (int i = 0; i < m_impl->samplesPerFrame/nDownsample; ++i) {
+                int s = w*m_impl->samplesPerFrame/nDownsample + i;
 
-            while (s >= intervals[j].end) ++j;
+                while (s >= intervals[j].end) ++j;
 
-            if (m_impl->lastInterval.signal != intervals[j].signal) {
-                if (intervals[j].signal == 1) {
-                    m_impl->curLetter += intervals[j].type == 1 ? "1" : "0";
-                } else {
-                    if (intervals[j].type == 0 ||
-                        intervals[j].type == 2 ||
-                        intervals[j].type == 3) {
-                        if (auto let = kMorseCode.find(m_impl->curLetter); let != kMorseCode.end()) {
-                            m_impl->rxData.push_back(let->second);
-                            printf("%c", let->second);
-                        } else {
-                            m_impl->rxData.push_back('?');
-                            printf("?");
+                if (m_impl->lastInterval.signal != intervals[j].signal) {
+                    if (intervals[j].signal == 1) {
+                        m_impl->curLetter += intervals[j].type == 1 ? "1" : "0";
+                    } else {
+                        if (intervals[j].type == 0 ||
+                            intervals[j].type == 2 ||
+                            intervals[j].type == 3) {
+                            if (auto let = kMorseCode.find(m_impl->curLetter); let != kMorseCode.end()) {
+                                m_impl->rxData.push_back(let->second);
+                                printf("%c", let->second);
+                            } else {
+                                m_impl->rxData.push_back('?');
+                                printf("?");
+                            }
+                            fflush(stdout);
+                            m_impl->curLetter = "";
                         }
-                        fflush(stdout);
-                        m_impl->curLetter = "";
-                    }
-                    {
-                        std::string tmp = intervals[j].type == 2 ? "" : intervals[j].type == 3 ? " " : intervals[j].type == 1 ? "" : " ";
-                        if (tmp.size()) {
-                            m_impl->rxData.push_back(tmp[0]);
+                        {
+                            std::string tmp = intervals[j].type == 2 ? "" : intervals[j].type == 3 ? " " : intervals[j].type == 1 ? "" : " ";
+                            if (tmp.size()) {
+                                m_impl->rxData.push_back(tmp[0]);
+                            }
+                            printf("%s", tmp.c_str());
                         }
-                        printf("%s", tmp.c_str());
                     }
+                    m_impl->lastInterval = intervals[j];
                 }
-                m_impl->lastInterval = intervals[j];
             }
         }
     }

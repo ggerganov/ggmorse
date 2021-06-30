@@ -335,13 +335,11 @@ bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
 
     int idx = 0;
     float factorCur = 0.0;
-    float factorDst = 0.0;
     const auto dampFactor = 1.0f/std::max(1.0f, 0.1f*lendot0_samples);
     const auto & volume = m_impl->parametersEncode.volume;
     const auto & frequency_hz = m_impl->parametersEncode.frequency_hz;
     for (const char & s : symbols0) {
         if (s == '0') {
-            factorDst = 1.0f;
             for (int i = 0; i < lendot0_samples; ++i) {
                 m_impl->outputBlockF[idx] = factorCur*volume*std::sin((2.0*M_PI)*(idx*frequency_hz/m_impl->sampleRateOut));
                 factorCur = std::min(1.0f, factorCur + dampFactor);
@@ -349,7 +347,6 @@ bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
             }
         }
         if (s == '1') {
-            factorDst = 1.0f;
             for (int i = 0; i < 3*lendot0_samples; ++i) {
                 m_impl->outputBlockF[idx] = factorCur*volume*std::sin((2.0*M_PI)*(idx*frequency_hz/m_impl->sampleRateOut));
                 factorCur = std::min(1.0f, factorCur + dampFactor);
@@ -357,7 +354,6 @@ bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
             }
         }
         if (s == '2') {
-            factorDst = 0.0f;
             for (int i = 0; i < lendot1_samples; ++i) {
                 m_impl->outputBlockF[idx] = factorCur*volume*std::sin((2.0*M_PI)*(idx*frequency_hz/m_impl->sampleRateOut));
                 factorCur = std::max(0.0f, factorCur - dampFactor);
@@ -365,7 +361,6 @@ bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
             }
         }
         if (s == '3') {
-            factorDst = 0.0f;
             for (int i = 0; i < lenLetterSpace_samples; ++i) {
                 m_impl->outputBlockF[idx] = factorCur*volume*std::sin((2.0*M_PI)*(idx*frequency_hz/m_impl->sampleRateOut));
                 factorCur = std::max(0.0f, factorCur - dampFactor);
@@ -373,7 +368,6 @@ bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
             }
         }
         if (s == '4') {
-            factorDst = 0.0f;
             for (int i = 0; i < lenWordSpace_samples; ++i) {
                 m_impl->outputBlockF[idx] = factorCur*volume*std::sin((2.0*M_PI)*(idx*frequency_hz/m_impl->sampleRateOut));
                 factorCur = std::max(0.0f, factorCur - dampFactor);
@@ -648,8 +642,10 @@ void GGMorse::decode_float() {
         frequency_hz = m_impl->stfft.pitch(200.0f, 1200.0f);
     }
 
-    if (std::fabs(frequency_hz - m_impl->statistics.estimatedPitch_Hz) > 100.0) {
-        m_impl->goertzelFilter.clear();
+    int windowToAnalyze_samples = kMaxWindowToAnalyze_s*kBaseSampleRate;
+
+    if (std::fabs(frequency_hz - m_impl->statistics.estimatedPitch_Hz) > 50.0) {
+        m_impl->goertzelFilter.recompute(frequency_hz);
         m_impl->rxData.push_back('\n');
     }
 
@@ -668,7 +664,6 @@ void GGMorse::decode_float() {
     //auto filteredF = m_impl->goertzelFilter.filtered_min(kBaseSampleRate/200.0f);
 
     int nSamples = (int) filteredF.size();
-    int windowToAnalyze_samples = kMaxWindowToAnalyze_s*kBaseSampleRate;
     int nFramesInWindow = windowToAnalyze_samples/m_impl->samplesPerFrame;
 
     int nDownsample = 1;

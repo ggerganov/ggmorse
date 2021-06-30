@@ -59,6 +59,40 @@ struct GoertzelRunningFIR {
         }
     }
 
+    void recompute(float frequency_hz) {
+        int nw = (int) m_hamming.size();
+        int nh = (int) m_history.size();
+        int nf = (int) m_filtered.size();
+
+        float normalizedfreq = frequency_hz/m_sampleRate;
+
+        float w = 2*M_PI*normalizedfreq;
+        float wr = std::cos(w);
+        float wi = std::sin(w);
+
+        m_coeff = 2.0*wr;
+        m_cos = wr;
+        m_sin = wi;
+
+        m_processed_samples = 0;
+
+        for (int i = 0; i < nh; ++i) {
+            m_historyHead++;
+            if (m_historyHead >= nh) {
+                m_historyHead = 0;
+            }
+
+            m_processed_samples++;
+            if (m_processed_samples >= nw) {
+                m_filtered[m_filteredHead] = filter(m_historyHead - nw);
+                m_filteredHead++;
+                if (m_filteredHead >= nf) {
+                    m_filteredHead = 0;
+                }
+            }
+        }
+    }
+
     const std::vector<float> & filtered() {
         int nf = (int) m_filtered.size();
 
@@ -99,6 +133,7 @@ struct GoertzelRunningFIR {
     }
 
     void clear() {
+        m_processed_samples = 0;
         std::fill(m_history.begin(), m_history.end(), 0.0f);
         std::fill(m_filtered.begin(), m_filtered.end(), 0.0f);
     }

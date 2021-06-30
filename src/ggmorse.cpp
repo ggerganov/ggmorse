@@ -330,6 +330,10 @@ bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
             }
         }
     }
+    // finish transmission with an empty signal
+    nSamplesTotal += lendot1_samples;
+    symbols0 += "2";
+    symbols1 += "";
 
     m_impl->outputBlockF.resize(nSamplesTotal);
 

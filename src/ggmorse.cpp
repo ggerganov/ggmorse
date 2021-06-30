@@ -334,36 +334,49 @@ bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
     m_impl->outputBlockF.resize(nSamplesTotal);
 
     int idx = 0;
+    float factorCur = 0.0;
+    float factorDst = 0.0;
+    const auto dampFactor = 1.0f/std::max(1.0f, 0.1f*lendot0_samples);
     const auto & volume = m_impl->parametersEncode.volume;
     const auto & frequency_hz = m_impl->parametersEncode.frequency_hz;
     for (const char & s : symbols0) {
         if (s == '0') {
+            factorDst = 1.0f;
             for (int i = 0; i < lendot0_samples; ++i) {
-                m_impl->outputBlockF[idx] = volume*std::sin((2.0*M_PI)*(idx*frequency_hz/m_impl->sampleRateOut));
+                m_impl->outputBlockF[idx] = factorCur*volume*std::sin((2.0*M_PI)*(idx*frequency_hz/m_impl->sampleRateOut));
+                factorCur = std::min(1.0f, factorCur + dampFactor);
                 ++idx;
             }
         }
         if (s == '1') {
+            factorDst = 1.0f;
             for (int i = 0; i < 3*lendot0_samples; ++i) {
-                m_impl->outputBlockF[idx] = volume*std::sin((2.0*M_PI)*(idx*frequency_hz/m_impl->sampleRateOut));
+                m_impl->outputBlockF[idx] = factorCur*volume*std::sin((2.0*M_PI)*(idx*frequency_hz/m_impl->sampleRateOut));
+                factorCur = std::min(1.0f, factorCur + dampFactor);
                 ++idx;
             }
         }
         if (s == '2') {
+            factorDst = 0.0f;
             for (int i = 0; i < lendot1_samples; ++i) {
-                m_impl->outputBlockF[idx] = 0.0f;
+                m_impl->outputBlockF[idx] = factorCur*volume*std::sin((2.0*M_PI)*(idx*frequency_hz/m_impl->sampleRateOut));
+                factorCur = std::max(0.0f, factorCur - dampFactor);
                 ++idx;
             }
         }
         if (s == '3') {
+            factorDst = 0.0f;
             for (int i = 0; i < lenLetterSpace_samples; ++i) {
-                m_impl->outputBlockF[idx] = 0.0f;
+                m_impl->outputBlockF[idx] = factorCur*volume*std::sin((2.0*M_PI)*(idx*frequency_hz/m_impl->sampleRateOut));
+                factorCur = std::max(0.0f, factorCur - dampFactor);
                 ++idx;
             }
         }
         if (s == '4') {
+            factorDst = 0.0f;
             for (int i = 0; i < lenWordSpace_samples; ++i) {
-                m_impl->outputBlockF[idx] = 0.0f;
+                m_impl->outputBlockF[idx] = factorCur*volume*std::sin((2.0*M_PI)*(idx*frequency_hz/m_impl->sampleRateOut));
+                factorCur = std::max(0.0f, factorCur - dampFactor);
                 ++idx;
             }
         }

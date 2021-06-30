@@ -57,7 +57,7 @@ std::mutex g_mutex;
     return buffer;
 }
 
-bool ScrollWhenDraggingOnVoid(const ImVec2& delta, ImGuiMouseButton mouse_button) {
+bool ScrollWhenDraggingOnVoid(const ImVec2 & delta, ImGuiMouseButton mouse_button) {
     ImGuiContext& g = *ImGui::GetCurrentContext();
     ImGuiWindow* window = g.CurrentWindow;
     bool hovered = false;

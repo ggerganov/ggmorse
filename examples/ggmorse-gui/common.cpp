@@ -47,7 +47,7 @@ void ImGui_TextCentered(const char * text, bool disabled) {
 }
 
 std::mutex g_mutex;
-char * toTimeString(const std::chrono::system_clock::time_point & tp) {
+[[maybe_unused]] char * toTimeString(const std::chrono::system_clock::time_point & tp) {
     std::lock_guard<std::mutex> lock(g_mutex);
 
     time_t t = std::chrono::system_clock::to_time_t(tp);
@@ -224,6 +224,7 @@ struct State {
     struct Flags {
         bool newStats = false;
         bool newSpectrogram = false;
+        bool newTxWaveform = false;
         bool newRxData = false;
         bool newSignalF = false;
 
@@ -245,6 +246,12 @@ struct State {
             dst.rxSpectrogram = std::move(this->rxSpectrogram);
         }
 
+        if (this->flags.newTxWaveform) {
+            dst.update = true;
+            dst.flags.newTxWaveform = true;
+            dst.txWaveform = std::move(this->txWaveform);
+        }
+
         if (this->flags.newRxData) {
             dst.update = true;
             dst.flags.newRxData = true;
@@ -263,6 +270,7 @@ struct State {
 
     GGMorseStats stats;
     GGMorse::Spectrogram rxSpectrogram;
+    GGMorse::WaveformI16 txWaveform;
     GGMorse::TxRx rxData;
     GGMorse::SignalF signalF;
 };
@@ -387,6 +395,11 @@ void updateCore() {
         g_buffer.stateCore.rxSpectrogram = ggMorse->getSpectrogram();
     }
 
+    if (ggMorse->takeTxWaveformI16(g_buffer.stateCore.txWaveform)) {
+        g_buffer.stateCore.update = true;
+        g_buffer.stateCore.flags.newTxWaveform = true;
+    }
+
     rxDataLengthLast = ggMorse->takeRxData(rxDataLast);
     if (rxDataLengthLast > 0) {
         g_buffer.stateCore.update = true;
@@ -440,7 +453,7 @@ void renderMain() {
 
     static WindowId windowId = WindowId::Tx;
     static WindowId windowIdLast = windowId;
-    static SubWindowIdRx subWindowIdRx = SubWindowIdRx::Main;
+    [[maybe_unused]] static SubWindowIdRx subWindowIdRx = SubWindowIdRx::Main;
 
     static Settings settings;
 
@@ -453,18 +466,11 @@ void renderMain() {
     static bool doSendMessage = false;
     static bool mouseButtonLeftLast = 0;
     static bool isTextInput = false;
-    static bool scrollMessagesToBottom = true;
     static bool hasAudioCaptureData = false;
     static bool hasNewMessages = false;
-    static bool hasNewSpectrogram = false;
-#ifdef __EMSCRIPTEN__
-    static bool hasFileSharingSupport = false;
-#else
-    static bool hasFileSharingSupport = true;
-#endif
 
-    static double tStartInput = 0.0;
-    static double tEndInput = -100.0;
+    [[maybe_unused]] static double tStartInput = 0.0;
+    [[maybe_unused]] static double tEndInput = -100.0;
     static double tStartTx = 0.0;
     static double tLengthTx = 0.0;
     static double tLastFrame = 0.0;
@@ -473,6 +479,7 @@ void renderMain() {
 
     static GGMorseStats statsCurrent;
     static GGMorse::Spectrogram spectrogramCurrent;
+    static GGMorse::WaveformI16 txWaveformCurrent;
     static GGMorse::SignalF signalFCurrent;
 
     // keyboard shortcuts:
@@ -493,6 +500,25 @@ void renderMain() {
         if (stateCurrent.flags.newSpectrogram) {
             spectrogramCurrent = std::move(stateCurrent.rxSpectrogram);
             hasAudioCaptureData = !spectrogramCurrent.empty();
+        }
+        if (stateCurrent.flags.newTxWaveform) {
+            txWaveformCurrent = std::move(stateCurrent.txWaveform);
+
+            tStartTx = ImGui::GetTime();
+            tLengthTx = txWaveformCurrent.size()/statsCurrent.sampleRateOut;
+            {
+                auto & ampl = txWaveformCurrent;
+                int nBins = 512;
+                int nspb = (int) ampl.size()/nBins;
+                for (int i = 0; i < nBins; ++i) {
+                    double sum = 0.0;
+                    for (int j = 0; j < nspb; ++j) {
+                        sum += std::abs(ampl[i*nspb + j]);
+                    }
+                    ampl[i] = sum/nspb;
+                }
+                ampl.resize(nBins);
+            }
         }
         if (stateCurrent.flags.newRxData) {
             for (const auto & ch : stateCurrent.rxData) {
@@ -519,7 +545,7 @@ void renderMain() {
     auto& style = ImGui::GetStyle();
 
     const auto sendButtonText = ICON_FA_PLAY_CIRCLE " Send";
-    const double tShowKeyboard = 0.2f;
+    [[maybe_unused]] const double tShowKeyboard = 0.2f;
 #if defined(IOS)
     const float statusBarHeight = displaySize.x < displaySize.y ? 2.0f*style.ItemSpacing.y : 0.1f;
 #else
@@ -1009,9 +1035,59 @@ void renderMain() {
                 const auto p0 = ImGui::GetCursorScreenPos();
                 ImGui::SetCursorScreenPos({ p0.x, p0.y + 0.5f*ImGui::GetTextLineHeight() });
 
-                ImGui::TextDisabled("F: %5.1f Hz | S: %d/%d WPM | Repeat: %s",
-                                    txFrequency_hz, txSpeedCharacters_wpm, txSpeedFarnsworth_wpm,
-                                    (txRepeat ? "ON" : "OFF"));
+                static float amax = 0.0f;
+                static float frac = 0.0f;
+
+                amax = 0.0f;
+                frac = (ImGui::GetTime() - tStartTx)/tLengthTx;
+
+                if (txWaveformCurrent.size() && frac <= 1.0f) {
+                    struct Funcs {
+                        static float Sample(void * data, int i) {
+                            auto res = std::fabs(((int16_t *)(data))[i]) ;
+                            if (res > amax) amax = res;
+                            return res;
+                        }
+
+                        static float SampleFrac(void * data, int i) {
+                            if (i > frac*txWaveformCurrent.size()) {
+                                return 0.0f;
+                            }
+                            return std::fabs(((int16_t *)(data))[i]);
+                        }
+                    };
+
+                    auto posSave = ImGui::GetCursorScreenPos();
+                    auto wSize = ImGui::GetContentRegionAvail();
+                    wSize.x = ImGui::GetContentRegionAvailWidth() - ImGui::CalcTextSize(sendButtonText).x - 2*style.ItemSpacing.x;
+                    wSize.y = ImGui::GetTextLineHeight();
+
+                    ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.3f, 0.3f, 0.3f, 0.3f });
+                    ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+                    ImGui::PlotHistogram("##plotSpectrumCurrent",
+                                         Funcs::Sample,
+                                         txWaveformCurrent.data(),
+                                         (int) txWaveformCurrent.size(), 0,
+                                         (std::string("")).c_str(),
+                                         0.0f, FLT_MAX, wSize);
+                    ImGui::PopStyleColor(2);
+
+                    ImGui::SetCursorScreenPos(posSave);
+
+                    ImGui::PushStyleColor(ImGuiCol_FrameBg, { 0.0f, 0.0f, 0.0f, 0.0f });
+                    ImGui::PushStyleColor(ImGuiCol_PlotHistogram, { 0.0f, 1.0f, 0.0f, 1.0f });
+                    ImGui::PlotHistogram("##plotSpectrumCurrent",
+                                         Funcs::SampleFrac,
+                                         txWaveformCurrent.data(),
+                                         (int) txWaveformCurrent.size(), 0,
+                                         (std::string("")).c_str(),
+                                         0.0f, amax, wSize);
+                    ImGui::PopStyleColor(2);
+                } else {
+                    ImGui::TextDisabled("F: %5.1f Hz | S: %d/%d WPM | Repeat: %s",
+                                        txFrequency_hz, txSpeedCharacters_wpm, txSpeedFarnsworth_wpm,
+                                        (txRepeat ? "ON" : "OFF"));
+                }
 
                 if (doInputFocus) {
                     ImGui::SetKeyboardFocusHere();
@@ -1091,7 +1167,6 @@ void renderMain() {
 
                         inputBuf[0] = 0;
                         doInputFocus = true;
-                        scrollMessagesToBottom = true;
                     }
                 }
                 if (!ImGui::IsItemHovered() && requestStopTextInput) {

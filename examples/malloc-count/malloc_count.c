@@ -29,6 +29,8 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
+
+#ifdef __USE_MALLOC_COUNT__
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -145,8 +147,6 @@ void malloc_count_set_callback(malloc_count_callback_type cb, void* cookie)
     callback = cb;
     callback_cookie = cookie;
 }
-
-#ifdef __USE_MALLOC_COUNT__
 
 /****************************************************/
 /* exported symbols that overlay the libc functions */

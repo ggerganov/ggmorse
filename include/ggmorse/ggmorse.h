@@ -133,6 +133,7 @@ public:
 
     int takeRxData(TxRx & dst);
     int takeSignalF(SignalF & dst);
+    int takeTxWaveformI16(WaveformI16 & dst);
 
     const Statistics & getStatistics() const;
     const Spectrogram getSpectrogram() const;

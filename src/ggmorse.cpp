@@ -138,6 +138,7 @@ struct GGMorse::Impl {
     TxRx rxData = {};
     TxRx txData = {};
     SignalF signalF = {};
+    WaveformI16 txWaveformI16 = {};
 
     TxRx outputBlockTmp = {};
     WaveformF outputBlockF = {};
@@ -368,6 +369,12 @@ bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
         }
     }
 
+    // default output is in 16-bit signed int so we always compute it
+    m_impl->outputBlockI16.resize(nSamplesTotal);
+    for (int i = 0; i < nSamplesTotal; ++i) {
+        m_impl->outputBlockI16[i] = 32768*m_impl->outputBlockF[i];
+    }
+
     // convert from 32-bit float
     m_impl->outputBlockTmp.resize(nSamplesTotal*m_impl->sampleSizeBytesOut);
     switch (m_impl->sampleFormatOut) {
@@ -398,10 +405,11 @@ bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
             } break;
         case GGMORSE_SAMPLE_FORMAT_I16:
             {
-                auto p = reinterpret_cast<uint16_t *>(m_impl->outputBlockTmp.data());
-                for (int i = 0; i < nSamplesTotal; ++i) {
-                    p[i] = 32768*m_impl->outputBlockF[i];
-                }
+                // skip because we already have the data in m_impl->outputBlockI16
+                //auto p = reinterpret_cast<uint16_t *>(m_impl->outputBlockTmp.data());
+                //for (int i = 0; i < nSamplesTotal; ++i) {
+                //    p[i] = 32768*m_impl->outputBlockF[i];
+                //}
             } break;
         case GGMORSE_SAMPLE_FORMAT_F32:
             {
@@ -418,14 +426,22 @@ bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
             {
                 return false;
             } break;
+        case GGMORSE_SAMPLE_FORMAT_I16:
+            {
+                cbWaveformOut(m_impl->outputBlockI16.data(), nSamplesTotal*m_impl->sampleSizeBytesOut);
+            } break;
         case GGMORSE_SAMPLE_FORMAT_U8:
         case GGMORSE_SAMPLE_FORMAT_I8:
-        case GGMORSE_SAMPLE_FORMAT_I16:
         case GGMORSE_SAMPLE_FORMAT_U16:
         case GGMORSE_SAMPLE_FORMAT_F32:
             {
                 cbWaveformOut(m_impl->outputBlockTmp.data(), nSamplesTotal*m_impl->sampleSizeBytesOut);
             } break;
+    }
+
+    m_impl->txWaveformI16.resize(nSamplesTotal);
+    for (int i = 0; i < nSamplesTotal; ++i) {
+        m_impl->txWaveformI16[i] = m_impl->outputBlockI16[i];
     }
 
     return true;
@@ -930,6 +946,14 @@ int GGMorse::takeSignalF(SignalF & dst) {
     if (m_impl->signalF.size() == 0) return 0;
 
     dst = std::move(m_impl->signalF);
+
+    return (int) dst.size();
+}
+
+int GGMorse::takeTxWaveformI16(WaveformI16 & dst) {
+    if (m_impl->txWaveformI16.size() == 0) return false;
+
+    dst = std::move(m_impl->txWaveformI16);
 
     return (int) dst.size();
 }

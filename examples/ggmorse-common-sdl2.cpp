@@ -148,9 +148,15 @@ bool GGMorse_init(
     if (g_devIdInp == 0) {
         SDL_AudioSpec captureSpec;
         captureSpec = g_obtainedSpecOut;
+
         captureSpec.freq = 48000;
         captureSpec.format = AUDIO_F32SYS;
         captureSpec.samples = (captureSpec.freq/GGMorse::kBaseSampleRate)*GGMorse::kDefaultSamplesPerFrame;
+#ifdef __EMSCRIPTEN__
+        int pow2 = 256;
+        while (pow2 < captureSpec.samples) pow2 *= 2;
+        captureSpec.samples = pow2;
+#endif
 
         SDL_zero(g_obtainedSpecInp);
 

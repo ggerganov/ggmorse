@@ -102,7 +102,7 @@ bool GGMorse_init(
         playbackSpec.freq = 48000;
         playbackSpec.format = AUDIO_S16SYS;
         playbackSpec.channels = 1;
-        playbackSpec.samples = 1024;
+        playbackSpec.samples = 16*1024;
         playbackSpec.callback = NULL;
 
         SDL_zero(g_obtainedSpecOut);

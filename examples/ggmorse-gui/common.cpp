@@ -504,7 +504,7 @@ void renderMain() {
         if (stateCurrent.flags.newTxWaveform) {
             txWaveformCurrent = std::move(stateCurrent.txWaveform);
 
-            tStartTx = ImGui::GetTime();
+            tStartTx = ImGui::GetTime() + (24.0f*1024.0f)/statsCurrent.sampleRateOut;
             tLengthTx = txWaveformCurrent.size()/statsCurrent.sampleRateOut;
             {
                 auto & ampl = txWaveformCurrent;

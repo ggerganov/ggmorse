@@ -33,12 +33,6 @@ std::shared_ptr<GGMorse> g_ggMorse;
 
 extern "C" {
     EMSCRIPTEN_KEEPALIVE
-        int sendData(int textLength, const char * text, int protocolId, int volume) {
-            // todo
-            return 0;
-        }
-
-    EMSCRIPTEN_KEEPALIVE
         int getText(char * text) {
             std::copy(g_ggMorse->getRxData().begin(), g_ggMorse->getRxData().end(), text);
             return 0;

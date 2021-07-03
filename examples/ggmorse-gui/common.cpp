@@ -839,7 +839,6 @@ void renderMain() {
 
                 if (showStats) {
                     ImGui::SetCursorScreenPos({ p0.x + 0.5f*itemSpacingSave.x, p0.y + wSize.y - statsHeight });
-                    ImGui::SetWindowFontScale(rxFontScale);
                     ImGui::PushFont(ImGui::GetIO().Fonts->Fonts.back());
                     ImGui::TextColored({ 1.0f, 1.0f, 0.0f, 1.0f }, "F: %6.1f Hz | S: %2.0f WPM | FPS: %4.1f | R: %4.1f ms",
                                        statsCurrent.statistics.estimatedPitch_Hz,
@@ -848,7 +847,6 @@ void renderMain() {
                                        tLastFrame
                                       );
                     ImGui::PopFont();
-                    ImGui::SetWindowFontScale(1.0f);
                 }
                 ImGui::EndChild();
 

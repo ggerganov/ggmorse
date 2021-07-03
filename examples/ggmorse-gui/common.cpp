@@ -698,6 +698,7 @@ void renderMain() {
 
     if (windowId != WindowId::Settings) {
         static float rxDataHeight = 5.5f;
+        static float rxFontScale = 1.0f;
         static bool txRepeat = false;
         static float txFrequency_hz = 550.0f;
         static int txSpeedCharacters_wpm = 25;
@@ -838,6 +839,7 @@ void renderMain() {
 
                 if (showStats) {
                     ImGui::SetCursorScreenPos({ p0.x + 0.5f*itemSpacingSave.x, p0.y + wSize.y - statsHeight });
+                    ImGui::SetWindowFontScale(rxFontScale);
                     ImGui::PushFont(ImGui::GetIO().Fonts->Fonts.back());
                     ImGui::TextColored({ 1.0f, 1.0f, 0.0f, 1.0f }, "F: %6.1f Hz | S: %2.0f WPM | FPS: %4.1f | R: %4.1f ms",
                                        statsCurrent.statistics.estimatedPitch_Hz,
@@ -846,6 +848,7 @@ void renderMain() {
                                        tLastFrame
                                       );
                     ImGui::PopFont();
+                    ImGui::SetWindowFontScale(1.0f);
                 }
                 ImGui::EndChild();
 
@@ -907,6 +910,7 @@ void renderMain() {
                                     ImGui::EndCombo();
                                 }
                                 ImGui::DragFloat("##height", &rxDataHeight, 1.0f, 4.0f, 10.0f, "Rx height: %.1f", 1.0f);
+                                ImGui::DragFloat("##fontScale", &rxFontScale, 0.01f, 0.8f, 2.0f, "Font scale: %.2f", 1.0f);
 
                                 if (isFrequencyAuto) {
                                     frequencySelected_hz = statsCurrent.statistics.estimatedPitch_Hz;
@@ -979,9 +983,11 @@ void renderMain() {
 
                 ImGui::PushFont(ImGui::GetIO().Fonts->Fonts.back());
                 ImGui::BeginChild("Rx:data", mainSize, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+                ImGui::SetWindowFontScale(rxFontScale);
                 ImGui::PushTextWrapPos(ImGui::GetContentRegionAvailWidth());
                 ImGui::Text("%s", rxData.c_str());
                 ImGui::PopTextWrapPos();
+                ImGui::SetWindowFontScale(1.0f);
                 ImGui::SetScrollY(ImGui::GetScrollMaxY() - style.ItemSpacing.y);
 
                 if (!isContextMenuOpen) {

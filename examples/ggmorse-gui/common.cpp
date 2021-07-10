@@ -451,7 +451,7 @@ void renderMain() {
         float volume = 0.10f;
     };
 
-    static WindowId windowId = WindowId::Tx;
+    static WindowId windowId = WindowId::Rx;
     static WindowId windowIdLast = windowId;
     [[maybe_unused]] static SubWindowIdRx subWindowIdRx = SubWindowIdRx::Main;
 
@@ -697,12 +697,15 @@ void renderMain() {
     }
 
     if (windowId != WindowId::Settings) {
-        static float rxDataHeight = 5.5f;
+        static float rxDataHeight = 10.5f;
         static float rxFontScale = 1.0f;
         static bool txRepeat = false;
         static float txFrequency_hz = 550.0f;
         static int txSpeedCharacters_wpm = 25;
         static int txSpeedFarnsworth_wpm = 25;
+
+        const float rxDataHeightMax = std::round(ImGui::GetContentRegionAvail().y/ImGui::GetTextLineHeightWithSpacing()) - 5;
+        rxDataHeight = std::min(rxDataHeight, rxDataHeightMax);
 
         if (hasAudioCaptureData == false) {
             ImGui::Text("%s", "");
@@ -717,8 +720,7 @@ void renderMain() {
                 static int binMax = 1300.0f/df;
 
                 static float intensityScale = 30.0f;
-                static float statsHeight = ImGui::GetTextLineHeight();
-                static float signalHeight = 3*statsHeight;
+                static float signalHeight = 2*ImGui::GetTextLineHeightWithSpacing();
                 static float frequencyMarkerSize = 0.5f*ImGui::CalcTextSize("A").x;
                 static float frequencySelected_hz = 550.0f;
                 static float speedSelected_wpm = 25.0f;
@@ -838,13 +840,19 @@ void renderMain() {
                 }
 
                 if (showStats) {
-                    ImGui::SetCursorScreenPos({ p0.x + 0.5f*itemSpacingSave.x, p0.y + wSize.y - statsHeight });
+                    const float offset = showSignal ? signalHeight : 0.0f;
                     ImGui::PushFont(ImGui::GetIO().Fonts->Fonts.back());
-                    ImGui::TextColored({ 1.0f, 1.0f, 0.0f, 1.0f }, "F: %6.1f Hz | S: %2.0f WPM | FPS: %4.1f | R: %4.1f ms",
-                                       statsCurrent.statistics.estimatedPitch_Hz,
-                                       statsCurrent.statistics.estimatedSpeed_wpm,
+                    const float statsHeight = ImGui::GetTextLineHeightWithSpacing();
+                    ImGui::SetCursorScreenPos({ p0.x + 0.5f*itemSpacingSave.x, p0.y + wSize.y - offset - 2*statsHeight });
+                    ImGui::TextColored({ 1.0f, 1.0f, 0.0f, 1.0f }, "FPS: %4.1f | R: %4.1f ms",
                                        ImGui::GetIO().Framerate,
                                        tLastFrame
+                                      );
+                    ImGui::SetCursorScreenPos({ p0.x + 0.5f*itemSpacingSave.x, p0.y + wSize.y - offset - 1*statsHeight });
+                    ImGui::TextColored({ 1.0f, 1.0f, 0.0f, 1.0f }, "F: %6.1f Hz | S: %2.0f WPM | C: %5.3f",
+                                       statsCurrent.statistics.estimatedPitch_Hz,
+                                       statsCurrent.statistics.estimatedSpeed_wpm,
+                                       statsCurrent.statistics.costFunction
                                       );
                     ImGui::PopFont();
                 }
@@ -907,7 +915,7 @@ void renderMain() {
                                     }
                                     ImGui::EndCombo();
                                 }
-                                ImGui::DragFloat("##height", &rxDataHeight, 1.0f, 4.0f, 10.0f, "Rx height: %.1f", 1.0f);
+                                ImGui::DragFloat("##height", &rxDataHeight, 1.0f, 4.0f, rxDataHeightMax, "Rx height: %.1f", 1.0f);
                                 ImGui::DragFloat("##fontScale", &rxFontScale, 0.01f, 0.8f, 2.0f, "Font scale: %.2f", 1.0f);
 
                                 if (isFrequencyAuto) {
@@ -947,7 +955,7 @@ void renderMain() {
                                     if (ImGui::DragInt("##speedCharacters", &txSpeedCharacters_wpm, 1, 5, 55, buf)) {
                                         txSpeedFarnsworth_wpm = txSpeedCharacters_wpm;
                                     }
-                                    snprintf(buf, 64, "Fanrsworth speed: %2d WPM", txSpeedFarnsworth_wpm);
+                                    snprintf(buf, 64, "Farnsworth speed: %2d WPM", txSpeedFarnsworth_wpm);
                                     ImGui::DragInt("##speedFarnsworth", &txSpeedFarnsworth_wpm, 1, 5, 55, buf);
                                     ImGui::Checkbox("Repeat", &txRepeat);
                                 }

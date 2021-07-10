@@ -61,6 +61,7 @@ extern "C" {
         float estimatedPitch_Hz;
         float estimatedSpeed_wpm;
         float signalThreshold;
+        float costFunction;
     } ggmorse_Statistics;
 
 #ifdef __cplusplus

@@ -885,8 +885,10 @@ void GGMorse::decode_float() {
     }
 
     m_impl->statistics.timeFrameAnalysis_ms = dt_ms(tStart_us);
+    m_impl->statistics.costFunction = bestCost;
 
     {
+        const bool isDecoding = bestCost < 1.0f;
         const auto & intervals = m_impl->intervalsAll[bestSpeedIdx][bestLevelIdx];
 
         const float estimatedSpeed_wpm = 5 + bestSpeedIdx;
@@ -919,28 +921,30 @@ void GGMorse::decode_float() {
                 while (s >= intervals[j].end) ++j;
 
                 if (m_impl->lastInterval.signal != intervals[j].signal) {
-                    if (intervals[j].signal == 1) {
-                        m_impl->curLetter += intervals[j].type == 1 ? "1" : "0";
-                    } else {
-                        if (intervals[j].type == 0 ||
-                            intervals[j].type == 2 ||
-                            intervals[j].type == 3) {
-                            if (auto let = kMorseCode.find(m_impl->curLetter); let != kMorseCode.end()) {
-                                m_impl->rxData.push_back(let->second);
-                                printf("%c", let->second);
-                            } else {
-                                m_impl->rxData.push_back('?');
-                                printf("?");
+                    if (isDecoding) {
+                        if (intervals[j].signal == 1) {
+                            m_impl->curLetter += intervals[j].type == 1 ? "1" : "0";
+                        } else {
+                            if (intervals[j].type == 0 ||
+                                intervals[j].type == 2 ||
+                                intervals[j].type == 3) {
+                                if (auto let = kMorseCode.find(m_impl->curLetter); let != kMorseCode.end()) {
+                                    m_impl->rxData.push_back(let->second);
+                                    printf("%c", let->second);
+                                } else {
+                                    m_impl->rxData.push_back('?');
+                                    printf("?");
+                                }
+                                fflush(stdout);
+                                m_impl->curLetter = "";
                             }
-                            fflush(stdout);
-                            m_impl->curLetter = "";
-                        }
-                        {
-                            std::string tmp = intervals[j].type == 2 ? "" : intervals[j].type == 3 ? " " : intervals[j].type == 1 ? "" : " ";
-                            if (tmp.size()) {
-                                m_impl->rxData.push_back(tmp[0]);
+                            {
+                                std::string tmp = intervals[j].type == 2 ? "" : intervals[j].type == 3 ? " " : intervals[j].type == 1 ? "" : " ";
+                                if (tmp.size()) {
+                                    m_impl->rxData.push_back(tmp[0]);
+                                }
+                                printf("%s", tmp.c_str());
                             }
-                            printf("%s", tmp.c_str());
                         }
                     }
                     m_impl->lastInterval = intervals[j];

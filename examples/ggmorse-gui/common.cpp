@@ -308,7 +308,7 @@ struct Input {
     }
 
     // parametersDecode
-    GGMorse::ParametersDecode parametersDecode;
+    GGMorse::ParametersDecode parametersDecode = GGMorse::getDefaultParametersDecode();
 
     // message
     Message message;
@@ -465,8 +465,10 @@ void renderMain() {
 
         bool showStats = true;
         bool showSignal = true;
-        bool isFrequencyAuto = true;
-        bool isSpeedAuto = true;
+        bool isFrequencyAuto = GGMorse::getDefaultParametersDecode().frequency_hz < 0.0;
+        bool isSpeedAuto = GGMorse::getDefaultParametersDecode().speed_wpm < 0.0;
+        bool applyFilterHighPass = GGMorse::getDefaultParametersDecode().applyFilterHighPass;
+        bool applyFilterLowPass = GGMorse::getDefaultParametersDecode().applyFilterHighPass;
 
         bool txRepeat = false;
         float txFrequency_hz = 550.0f;
@@ -694,6 +696,46 @@ void renderMain() {
             }
         }
 
+        //ImGui::Text("%s", "");
+        //{
+        //    auto posSave = ImGui::GetCursorScreenPos();
+        //    ImGui::Text("%s", "");
+        //    ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+        //    ImGui::PushTextWrapPos();
+        //    ImGui::TextDisabled("High-pass filter: %.2f Hz", settings.binMin*settings.df);
+        //    ImGui::PopTextWrapPos();
+        //}
+        //{
+        //    auto posSave = ImGui::GetCursorScreenPos();
+        //    ImGui::Text("High-pass");
+        //    ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+        //}
+        //{
+        //    if (ImGui::Checkbox("Apply##apply high-pass filter", &settings.applyFilterHighPass)) {
+        //        g_buffer.inputUI.flags.newParametersDecode = true;
+        //    }
+        //}
+
+        //ImGui::Text("%s", "");
+        //{
+        //    auto posSave = ImGui::GetCursorScreenPos();
+        //    ImGui::Text("%s", "");
+        //    ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+        //    ImGui::PushTextWrapPos();
+        //    ImGui::TextDisabled("Low-pass filter: %.2f Hz", settings.binMax*settings.df);
+        //    ImGui::PopTextWrapPos();
+        //}
+        //{
+        //    auto posSave = ImGui::GetCursorScreenPos();
+        //    ImGui::Text("Low-pass");
+        //    ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+        //}
+        //{
+        //    if (ImGui::Checkbox("Apply##apply low-pass filter", &settings.applyFilterLowPass)) {
+        //        g_buffer.inputUI.flags.newParametersDecode = true;
+        //    }
+        //}
+
         // Tx settings
         ImGui::Text("%s", "");
         {
@@ -810,7 +852,9 @@ void renderMain() {
         }
         {
             snprintf(buf, 64, "Bin: %3d, Freq: %5.1f Hz", settings.binMin, settings.binMin*settings.df);
-            ImGui::DragInt("##binMin", &settings.binMin, 1, 0, settings.binMax - 2, buf);
+            if (ImGui::DragInt("##binMin", &settings.binMin, 1, 0, settings.binMax - 2, buf)) {
+                g_buffer.inputUI.flags.newParametersDecode = true;
+            }
         }
 
         {
@@ -820,7 +864,9 @@ void renderMain() {
         }
         {
             snprintf(buf, 64, "Bin: %3d, Freq: %5.1f Hz", settings.binMax, settings.binMax*settings.df);
-            ImGui::DragInt("##binMax", &settings.binMax, 1, settings.binMin + 1, settings.nBins, buf);
+            if (ImGui::DragInt("##binMax", &settings.binMax, 1, settings.binMin + 1, settings.nBins, buf)) {
+                g_buffer.inputUI.flags.newParametersDecode = true;
+            }
         }
 
         {
@@ -917,6 +963,10 @@ void renderMain() {
             g_buffer.inputUI.update = true;
             g_buffer.inputUI.parametersDecode.frequency_hz = settings.isFrequencyAuto ? -1.0f : settings.frequencySelected_hz;
             g_buffer.inputUI.parametersDecode.speed_wpm = settings.isSpeedAuto ? -1.0f : settings.speedSelected_wpm;
+            g_buffer.inputUI.parametersDecode.frequencyRangeMin_hz = settings.binMin*settings.df;
+            g_buffer.inputUI.parametersDecode.frequencyRangeMax_hz = settings.binMax*settings.df;
+            g_buffer.inputUI.parametersDecode.applyFilterHighPass = settings.applyFilterHighPass;
+            g_buffer.inputUI.parametersDecode.applyFilterLowPass = settings.applyFilterLowPass;
         }
 
         ScrollWhenDraggingOnVoid(ImVec2(0.0f, -mouse_delta.y), ImGuiMouseButton_Left);
@@ -941,8 +991,8 @@ void renderMain() {
                 settings.df = 0.5*statsCurrent.sampleRateBase/settings.nBins;
 
                 if (settings.binMin == 0 && settings.binMax == 0 && settings.nBins > 1) {
-                    settings.binMin = 180.0f/settings.df;
-                    settings.binMax = 1300.0f/settings.df;
+                    settings.binMin = std::max(0.0f, g_buffer.inputUI.parametersDecode.frequencyRangeMin_hz - 20.0f)/settings.df;
+                    settings.binMax = (g_buffer.inputUI.parametersDecode.frequencyRangeMax_hz + 20.0f)/settings.df;
                 }
 
                 static float frequencyMarkerSize = 0.5f*ImGui::CalcTextSize("A").x;

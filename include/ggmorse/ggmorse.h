@@ -44,6 +44,11 @@ extern "C" {
     typedef struct {
         float frequency_hz;
         float speed_wpm;
+        float frequencyRangeMin_hz;
+        float frequencyRangeMax_hz;
+
+        bool applyFilterHighPass;
+        bool applyFilterLowPass;
     } ggmorse_ParametersDecode;
 
     typedef struct {

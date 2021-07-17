@@ -149,8 +149,8 @@ struct GGMorse::Impl {
     std::vector<std::vector<std::vector<Interval>>> intervalsAll = {};
 
     STFFT stfft = {};
-    Filter filterHighPass200Hz = {};
-    Filter filterLowPass2kHz = {};
+    Filter filterHighPass = {};
+    Filter filterLowPass = {};
     Resampler resampler = {};
     GoertzelRunningFIR goertzelFilter = {};
 };
@@ -171,6 +171,10 @@ const GGMorse::ParametersDecode & GGMorse::getDefaultParametersDecode() {
     static ggmorse_ParametersDecode result {
         -1.0f,
         -1.0f,
+        200.0f,
+        1200.0f,
+        true,
+        true,
     };
 
     return result;
@@ -216,8 +220,8 @@ GGMorse::GGMorse(const Parameters & parameters)
     while (pow2For50Hz < kBaseSampleRate/50) pow2For50Hz *= 2;
 
     m_impl->stfft.init(kBaseSampleRate, pow2For10Hz, parameters.samplesPerFrame, kMaxWindowToAnalyze_s);
-    m_impl->filterHighPass200Hz.init(Filter::FirstOrderHighPass, 200.0f, kBaseSampleRate);
-    m_impl->filterLowPass2kHz.init(Filter::FirstOrderLowPass, 2000.0f, parameters.sampleRateInp);
+    m_impl->filterHighPass.init(Filter::FirstOrderHighPass, m_impl->parametersDecode.frequencyRangeMin_hz, kBaseSampleRate);
+    m_impl->filterLowPass.init(Filter::FirstOrderLowPass, m_impl->parametersDecode.frequencyRangeMax_hz, m_impl->sampleRateInp);
     m_impl->goertzelFilter.init(kBaseSampleRate, pow2For50Hz, kMaxWindowToAnalyze_s);
 }
 
@@ -226,6 +230,13 @@ GGMorse::~GGMorse() {
 
 bool GGMorse::setParametersDecode(const ParametersDecode & parameters) {
     // todo : validate parameters
+
+    if (m_impl->parametersDecode.frequencyRangeMin_hz != parameters.frequencyRangeMin_hz) {
+        m_impl->filterHighPass.init(Filter::FirstOrderHighPass, m_impl->parametersDecode.frequencyRangeMin_hz, kBaseSampleRate);
+    }
+    if (m_impl->parametersDecode.frequencyRangeMax_hz != parameters.frequencyRangeMax_hz) {
+        m_impl->filterLowPass.init(Filter::FirstOrderLowPass, m_impl->parametersDecode.frequencyRangeMax_hz, m_impl->sampleRateInp);
+    }
 
     m_impl->parametersDecode = parameters;
 
@@ -576,7 +587,9 @@ bool GGMorse::decode(const CBWaveformInp & cbWaveformInp) {
 
         if (m_impl->sampleRateInp != kBaseSampleRate) {
             if (resampleSimple) {
-                m_impl->filterLowPass2kHz.process(m_impl->waveformResampled.data(), nSamplesRecorded);
+                if (m_impl->parametersDecode.applyFilterLowPass) {
+                    m_impl->filterLowPass.process(m_impl->waveformResampled.data(), nSamplesRecorded);
+                }
 
                 int ds = int(factor);
                 int nSamplesResampled = 0;
@@ -639,14 +652,17 @@ bool GGMorse::decode(const CBWaveformInp & cbWaveformInp) {
 void GGMorse::decode_float() {
     auto tStart_us = t_us();
 
-    m_impl->filterHighPass200Hz.process(m_impl->waveform.data(), m_impl->samplesPerFrame);
+    if (m_impl->parametersDecode.applyFilterHighPass) {
+        m_impl->filterHighPass.process(m_impl->waveform.data(), m_impl->samplesPerFrame);
+    }
+
     m_impl->stfft.process(m_impl->waveform.data(), m_impl->samplesPerFrame);
 
     auto frequency_hz = m_impl->parametersDecode.frequency_hz;
     auto speed_wpm = m_impl->parametersDecode.speed_wpm;
 
     if (frequency_hz <= 0.0f) {
-        frequency_hz = m_impl->stfft.pitch(200.0f, 1200.0f);
+        frequency_hz = m_impl->stfft.pitch(m_impl->parametersDecode.frequencyRangeMin_hz, m_impl->parametersDecode.frequencyRangeMax_hz);
     }
 
     int windowToAnalyze_samples = kMaxWindowToAnalyze_s*kBaseSampleRate;

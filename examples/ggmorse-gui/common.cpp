@@ -70,7 +70,10 @@ bool ScrollWhenDraggingOnVoid(const ImVec2 & delta, ImGuiMouseButton mouse_butto
         ImGui::SetScrollX(window, window->Scroll.x + delta.x);
     }
     if (held && delta.y != 0.0f) {
-        ImGui::SetScrollY(window, window->Scroll.y + delta.y);
+        auto dy = delta.y;
+        // fix vertical scroll snapping:
+        if (window->Scroll.y == 0.0f && delta.y > 0.0f && delta.y < 11.0f) dy = 11.0f;
+        ImGui::SetScrollY(window, window->Scroll.y + dy);
         dragging = true;
     }
     return dragging;
@@ -447,8 +450,28 @@ void renderMain() {
     };
 
     struct Settings {
-        bool isSampleRateOffset = false;
+        int nBins = 1;
+        int binMin = 0;
+        int binMax = 0;
+        float df = 1.0f;
+
         float volume = 0.10f;
+        float intensityScale = 30.0f;
+        float signalHeight = 2*ImGui::GetTextLineHeightWithSpacing();
+        float frequencySelected_hz = 550.0f;
+        float speedSelected_wpm = 25.0f;
+
+        ColorMap::Type colorMap = ColorMap::Type::Ggew;
+
+        bool showStats = true;
+        bool showSignal = true;
+        bool isFrequencyAuto = true;
+        bool isSpeedAuto = true;
+
+        bool txRepeat = false;
+        float txFrequency_hz = 550.0f;
+        int txSpeedCharacters_wpm = 25;
+        int txSpeedFarnsworth_wpm = 25;
     };
 
     static WindowId windowId = WindowId::Rx;
@@ -606,7 +629,7 @@ void renderMain() {
 
     if (windowId == WindowId::Settings) {
         ImGui::BeginChild("Settings:main", ImGui::GetContentRegionAvail(), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-        ImGui_TextCentered("GGMorse v1.2.1", false);
+        ImGui_TextCentered("GGMorse v1.3.0", false);
         ImGui::PushFont(ImGui::GetIO().Fonts->Fonts.back());
         ImGui::Text("%s", "");
         ImGui_TextCentered("created by", true);
@@ -616,29 +639,88 @@ void renderMain() {
         ImGui::PopFont();
         ImGui::Separator();
 
-        ImGui::Text("%s", "");
-        ImGui::Text("Sample rate (capture):  %g, %d B/sample", statsCurrent.sampleRateInp, statsCurrent.sampleSizeBytesInp);
-        ImGui::Text("Sample rate (playback): %g, %d B/sample", statsCurrent.sampleRateOut, statsCurrent.sampleSizeBytesOut);
-
+        static char buf[64];
         const float kLabelWidth = ImGui::CalcTextSize("Inp. SR Offset:  ").x;
 
-        // volume
+        // Rx settings
         ImGui::Text("%s", "");
         {
             auto posSave = ImGui::GetCursorScreenPos();
             ImGui::Text("%s", "");
             ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
-            if (settings.volume < 0.2f) {
-                ImGui::TextColored({ 0.0f, 1.0f, 0.0f, 0.5f }, "Normal volume");
-            } else if (settings.volume < 0.5f) {
-                ImGui::TextColored({ 1.0f, 1.0f, 0.0f, 0.5f }, "Intermediate volume");
-            } else {
-                ImGui::TextColored({ 1.0f, 0.0f, 0.0f, 0.5f }, "Warning: high volume!");
-            }
+            ImGui::PushTextWrapPos();
+            ImGui::TextDisabled("Rx settings");
+            ImGui::PopTextWrapPos();
         }
+
         {
             auto posSave = ImGui::GetCursorScreenPos();
-            ImGui::Text("Tx Volume: ");
+            ImGui::Text("Frequency: ");
+            ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+        }
+        {
+            if (settings.isFrequencyAuto) {
+                settings.frequencySelected_hz = statsCurrent.statistics.estimatedPitch_Hz;
+            }
+            if (ImGui::DragFloat("##rxFrequency", &settings.frequencySelected_hz, 1.0f, 200.0f, 1200.0f, "%.1f Hz", 1.0f)) {
+                settings.isFrequencyAuto = false;
+                g_buffer.inputUI.flags.newParametersDecode = true;
+            }
+            auto posSave = ImGui::GetCursorScreenPos();
+            ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+            if (ImGui::Checkbox("Auto##rxFrequency", &settings.isFrequencyAuto)) {
+                g_buffer.inputUI.flags.newParametersDecode = true;
+            }
+        }
+
+        ImGui::Text("%s", "");
+        {
+            auto posSave = ImGui::GetCursorScreenPos();
+            ImGui::Text("Speed: ");
+            ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+        }
+        {
+            if (settings.isSpeedAuto) {
+                settings.speedSelected_wpm = statsCurrent.statistics.estimatedSpeed_wpm;
+            }
+            if (ImGui::DragFloat("##speed", &settings.speedSelected_wpm, 1.0f, 5.0f, 55.0f, "%.0f WPM", 1.0f)) {
+                settings.isSpeedAuto = false;
+                g_buffer.inputUI.flags.newParametersDecode = true;
+            }
+            auto posSave = ImGui::GetCursorScreenPos();
+            ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+            if (ImGui::Checkbox("Auto##speed", &settings.isSpeedAuto)) {
+                g_buffer.inputUI.flags.newParametersDecode = true;
+            }
+        }
+
+        // Tx settings
+        ImGui::Text("%s", "");
+        {
+            auto posSave = ImGui::GetCursorScreenPos();
+            ImGui::Text("%s", "");
+            ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+            ImGui::PushTextWrapPos();
+            ImGui::TextDisabled("Tx settings");
+            ImGui::PopTextWrapPos();
+        }
+
+        //ImGui::Text("%s", "");
+        //{
+        //    auto posSave = ImGui::GetCursorScreenPos();
+        //    ImGui::Text("%s", "");
+        //    ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+        //    if (settings.volume < 0.2f) {
+        //        ImGui::TextColored({ 0.0f, 1.0f, 0.0f, 0.5f }, "Normal volume");
+        //    } else if (settings.volume < 0.5f) {
+        //        ImGui::TextColored({ 1.0f, 1.0f, 0.0f, 0.5f }, "Intermediate volume");
+        //    } else {
+        //        ImGui::TextColored({ 1.0f, 0.0f, 0.0f, 0.5f }, "Warning: high volume!");
+        //    }
+        //}
+        {
+            auto posSave = ImGui::GetCursorScreenPos();
+            ImGui::Text("Volume: ");
             ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
 
         }
@@ -650,7 +732,9 @@ void renderMain() {
                 ImGui::PushStyleColor(ImGuiCol_FrameBg, cols[ImGuiCol_WindowBg]);
                 ImGui::PushStyleColor(ImGuiCol_FrameBgActive, cols[ImGuiCol_WindowBg]);
                 ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, cols[ImGuiCol_WindowBg]);
-                ImGui::SliderFloat("##volume", &settings.volume, 0.0f, 1.0f);
+                if (ImGui::SliderFloat("##volume", &settings.volume, 0.0f, 1.0f)) {
+                    settings.volume = std::min(settings.volume, 0.5f);
+                }
                 ImGui::PopStyleColor(3);
             }
 
@@ -677,6 +761,143 @@ void renderMain() {
         }
 
         {
+            auto posSave = ImGui::GetCursorScreenPos();
+            ImGui::Text("Frequency: ");
+            ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+        }
+        {
+            snprintf(buf, 64, "%5.1f Hz", settings.txFrequency_hz);
+            ImGui::DragFloat("##txFrequency", &settings.txFrequency_hz, 1, 200, 1200, buf);
+        }
+
+        {
+            auto posSave = ImGui::GetCursorScreenPos();
+            ImGui::Text("Speed: ");
+            ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+        }
+        {
+            snprintf(buf, 64, "Characters speed: %2d WPM", settings.txSpeedCharacters_wpm);
+            if (ImGui::DragInt("##speedCharacters", &settings.txSpeedCharacters_wpm, 1, 5, 55, buf)) {
+                settings.txSpeedFarnsworth_wpm = settings.txSpeedCharacters_wpm;
+            }
+        }
+
+        {
+            auto posSave = ImGui::GetCursorScreenPos();
+            ImGui::Text("%s", "");
+            ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+        }
+        {
+            snprintf(buf, 64, "Farnsworth speed: %2d WPM", settings.txSpeedFarnsworth_wpm);
+            ImGui::DragInt("##speedFarnsworth", &settings.txSpeedFarnsworth_wpm, 1, 5, 55, buf);
+        }
+
+        // Spectrogam settings
+        ImGui::Text("%s", "");
+        {
+            auto posSave = ImGui::GetCursorScreenPos();
+            ImGui::Text("%s", "");
+            ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+            ImGui::PushTextWrapPos();
+            ImGui::TextDisabled("Spectrogram settings");
+            ImGui::PopTextWrapPos();
+        }
+
+        {
+            auto posSave = ImGui::GetCursorScreenPos();
+            ImGui::Text("Min: ");
+            ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+        }
+        {
+            snprintf(buf, 64, "Bin: %3d, Freq: %5.1f Hz", settings.binMin, settings.binMin*settings.df);
+            ImGui::DragInt("##binMin", &settings.binMin, 1, 0, settings.binMax - 2, buf);
+        }
+
+        {
+            auto posSave = ImGui::GetCursorScreenPos();
+            ImGui::Text("Max: ");
+            ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+        }
+        {
+            snprintf(buf, 64, "Bin: %3d, Freq: %5.1f Hz", settings.binMax, settings.binMax*settings.df);
+            ImGui::DragInt("##binMax", &settings.binMax, 1, settings.binMin + 1, settings.nBins, buf);
+        }
+
+        {
+            auto posSave = ImGui::GetCursorScreenPos();
+            ImGui::Text("Intensity: ");
+            ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+        }
+        {
+            ImGui::DragFloat("##intensityScale", &settings.intensityScale, 1.0f, 1.0f, 1000.0f, "Scale: %.1f");
+        }
+        {
+            auto posSave = ImGui::GetCursorScreenPos();
+            ImGui::Text("Color Map: ");
+            ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+        }
+        {
+            if (ImGui::BeginCombo("##colormap", ColorMap::kTypeString.at(settings.colorMap))) {
+                for (int i = 0; i < (int) ColorMap::kTypeString.size(); ++i) {
+                    const bool isSelected = (settings.colorMap == i);
+                    if (ImGui::Selectable(ColorMap::kTypeString.at(ColorMap::Type(i)), isSelected)) {
+                        settings.colorMap = ColorMap::Type(i);
+                    }
+
+                    if (isSelected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+        }
+
+        ImGui::Text("%s", "");
+        {
+            auto posSave = ImGui::GetCursorScreenPos();
+            ImGui::Text("%s", "");
+            ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+            ImGui::PushTextWrapPos();
+            ImGui::TextDisabled("Show signal plot");
+            ImGui::PopTextWrapPos();
+        }
+        {
+            auto posSave = ImGui::GetCursorScreenPos();
+            ImGui::Text("Signal: ");
+            ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+        }
+        {
+            ImGui::Checkbox("##Show signal", &settings.showSignal);
+        }
+
+        ImGui::Text("%s", "");
+        {
+            auto posSave = ImGui::GetCursorScreenPos();
+            ImGui::Text("%s", "");
+            ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+            ImGui::PushTextWrapPos();
+            ImGui::TextDisabled("Show realtime stats");
+            ImGui::PopTextWrapPos();
+        }
+        {
+            auto posSave = ImGui::GetCursorScreenPos();
+            ImGui::Text("Stats: ");
+            ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
+        }
+        {
+            ImGui::Checkbox("##Show stats", &settings.showStats);
+        }
+
+        ImGui::Text("%s", "");
+        ImGui::Separator();
+
+        {
+            ImGui::Text("%s", "");
+            ImGui::TextDisabled("Debug information");
+            ImGui::PushFont(ImGui::GetIO().Fonts->Fonts.back());
+            ImGui::Text("%s", "");
+            ImGui::Text("Sample rate (capture):  %g, %d B/sample", statsCurrent.sampleRateInp, statsCurrent.sampleSizeBytesInp);
+            ImGui::Text("Sample rate (playback): %g, %d B/sample", statsCurrent.sampleRateOut, statsCurrent.sampleSizeBytesOut);
             ImGui::Text("%s", "");
             ImGui::Text("Estimated Pitch:  %6.2f Hz", statsCurrent.statistics.estimatedPitch_Hz);
             ImGui::Text("Estimated Speed:  %6.2f WPM", statsCurrent.statistics.estimatedSpeed_wpm);
@@ -689,6 +910,13 @@ void renderMain() {
             ImGui::Text("Time to draw last frame:   %6.2f ms", tLastFrame);
             ImGui::Text("%s", "");
             ImGui::Text("Application framerate: %6.2f fps", ImGui::GetIO().Framerate);
+            ImGui::PopFont();
+        }
+
+        if (g_buffer.inputUI.flags.newParametersDecode) {
+            g_buffer.inputUI.update = true;
+            g_buffer.inputUI.parametersDecode.frequency_hz = settings.isFrequencyAuto ? -1.0f : settings.frequencySelected_hz;
+            g_buffer.inputUI.parametersDecode.speed_wpm = settings.isSpeedAuto ? -1.0f : settings.speedSelected_wpm;
         }
 
         ScrollWhenDraggingOnVoid(ImVec2(0.0f, -mouse_delta.y), ImGuiMouseButton_Left);
@@ -699,10 +927,6 @@ void renderMain() {
     if (windowId != WindowId::Settings) {
         static float rxDataHeight = 10.5f;
         static float rxFontScale = 1.0f;
-        static bool txRepeat = false;
-        static float txFrequency_hz = 550.0f;
-        static int txSpeedCharacters_wpm = 25;
-        static int txSpeedFarnsworth_wpm = 25;
 
         const float rxDataHeightMax = std::round(ImGui::GetContentRegionAvail().y/ImGui::GetTextLineHeightWithSpacing()) - 5;
         rxDataHeight = std::min(rxDataHeight, rxDataHeightMax);
@@ -713,26 +937,17 @@ void renderMain() {
             ImGui::TextColored({ 1.0f, 0.0f, 0.0f, 1.0f }, "Please make sure you have allowed microphone access for this app.");
         } else {
             {
-                const int nBins = (int) spectrogramCurrent[0].size()/2;
-                const float df = 0.5*statsCurrent.sampleRateBase/nBins;
+                settings.nBins = (int) spectrogramCurrent[0].size()/2;
+                settings.df = 0.5*statsCurrent.sampleRateBase/settings.nBins;
 
-                static int binMin = 180.0f/df;
-                static int binMax = 1300.0f/df;
+                if (settings.binMin == 0 && settings.binMax == 0 && settings.nBins > 1) {
+                    settings.binMin = 180.0f/settings.df;
+                    settings.binMax = 1300.0f/settings.df;
+                }
 
-                static float intensityScale = 30.0f;
-                static float signalHeight = 2*ImGui::GetTextLineHeightWithSpacing();
                 static float frequencyMarkerSize = 0.5f*ImGui::CalcTextSize("A").x;
-                static float frequencySelected_hz = 550.0f;
-                static float speedSelected_wpm = 25.0f;
-
-                static ColorMap::Type colorMap = ColorMap::Type::Ggew;
-
-                static bool showStats = true;
-                static bool showSignal = true;
-                static bool isHoldingDown = false;
-                static bool isContextMenuOpen = false;
-                static bool isFrequencyAuto = true;
-                static bool isSpeedAuto = true;
+                //static bool isHoldingDown = false;
+                //static bool isContextMenuOpen = false;
 
                 const auto p0 = ImGui::GetCursorScreenPos();
                 auto mainSize = ImGui::GetContentRegionAvail();
@@ -763,19 +978,19 @@ void renderMain() {
                 ImGui::BeginChild("Rx:main", mainSize, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
                 const int nx = (int) spectrogramCurrent.size();
-                const int ny = binMax - binMin;
+                const int ny = settings.binMax - settings.binMin;
 
                 float sum = 0.0;
                 for (int i = 0; i < nx; ++i) {
                     for (int j = 0; j < ny; ++j) {
-                        sum += spectrogramCurrent[i][binMin + j];
+                        sum += spectrogramCurrent[i][settings.binMin + j];
                     }
                 }
 
                 sum /= (nx*ny);
                 if (sum == 0.0) sum = 1.0;
-                const float iscale = 1.0f/(intensityScale*sum);
-                const auto c00 = ImGui::ColorConvertFloat4ToU32(getColor(colorMap, 0.0f));
+                const float iscale = 1.0f/(settings.intensityScale*sum);
+                const auto c00 = ImGui::ColorConvertFloat4ToU32(getColor(settings.colorMap, 0.0f));
 
                 auto wSize = ImGui::GetContentRegionAvail();
                 wSize.x -= frequencyMarkerSize;
@@ -801,12 +1016,12 @@ void renderMain() {
                         drawList = ImGui::GetWindowDrawList();
                     }
 
-                    int k = binMin + j;
+                    int k = settings.binMin + j;
                     for (int i = 0; i < nx; ++i) {
                         auto v = spectrogramCurrent[i][k]*iscale;
                         auto c0 = c00;
                         if (v > 0.05f) {
-                            c0 = ImGui::ColorConvertFloat4ToU32(getColor(colorMap, v));
+                            c0 = ImGui::ColorConvertFloat4ToU32(getColor(settings.colorMap, v));
                         }
                         //auto c0 = ImGui::ColorConvertFloat4ToU32({ 0.0f, 1.0f, 0.0f, v});
                         drawList->AddRectFilled({ p0.x + i*dx, p0.y + j*dy }, { p0.x + i*dx + dx, p0.y + j*dy + dy }, c0);
@@ -818,8 +1033,8 @@ void renderMain() {
                     }
 
                     const auto & f = statsCurrent.statistics.estimatedPitch_Hz;
-                    if (f >= k*df && f < (k + 1)*df) {
-                        drawList0->AddTriangleFilled({ p0.x + wSize.x,                  p0.y + j*dy + 0.5f*dy },
+                    if (f >= k*settings.df && f < (k + 1)*settings.df) {
+                        drawList0->AddTriangleFilled({ p0.x + wSize.x,                       p0.y + j*dy + 0.5f*dy },
                                                      { p0.x + wSize.x + frequencyMarkerSize, p0.y + j*dy + 0.5f*dy - 0.5f*frequencyMarkerSize },
                                                      { p0.x + wSize.x + frequencyMarkerSize, p0.y + j*dy + 0.5f*dy + 0.5f*frequencyMarkerSize },
                                                      ImGui::ColorConvertFloat4ToU32({ 1.0f, 1.0f, 0.0f, 1.0f }));
@@ -831,16 +1046,16 @@ void renderMain() {
 
                 ImGui::SetCursorScreenPos(p0);
                 ImGui::BeginChild("Stats", { wSize.x + frequencyMarkerSize, mainSize.y }, true);
-                if (showSignal) {
-                    ImGui::SetCursorScreenPos({ p0.x, p0.y + wSize.y - signalHeight });
-                    ImGui::PlotHistogram("##signal", signalFCurrent.data(), (int) signalFCurrent.size(), 0, NULL, FLT_MAX, FLT_MAX, { wSize.x, signalHeight });
-                    drawList->AddLine({ p0.x, p0.y + wSize.y - statsCurrent.statistics.signalThreshold*signalHeight },
-                                      { p0.x + wSize.x, p0.y + wSize.y - statsCurrent.statistics.signalThreshold*signalHeight },
+                if (settings.showSignal) {
+                    ImGui::SetCursorScreenPos({ p0.x, p0.y + wSize.y - settings.signalHeight });
+                    ImGui::PlotHistogram("##signal", signalFCurrent.data(), (int) signalFCurrent.size(), 0, NULL, FLT_MAX, FLT_MAX, { wSize.x, settings.signalHeight });
+                    drawList->AddLine({ p0.x, p0.y + wSize.y - statsCurrent.statistics.signalThreshold*settings.signalHeight },
+                                      { p0.x + wSize.x, p0.y + wSize.y - statsCurrent.statistics.signalThreshold*settings.signalHeight },
                                       ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.0f, 0.0f, 0.75f }));
                 }
 
-                if (showStats) {
-                    const float offset = showSignal ? signalHeight : 0.0f;
+                if (settings.showStats) {
+                    const float offset = settings.showSignal ? settings.signalHeight : 0.0f;
                     ImGui::PushFont(ImGui::GetIO().Fonts->Fonts.back());
                     const float statsHeight = ImGui::GetTextLineHeightWithSpacing();
                     ImGui::SetCursorScreenPos({ p0.x + 0.5f*itemSpacingSave.x, p0.y + wSize.y - offset - 2*statsHeight });
@@ -864,116 +1079,34 @@ void renderMain() {
                 style.WindowPadding = windowPaddingSave;
                 style.ChildBorderSize = childBorderSizeSave;
 
-                if (!isContextMenuOpen) {
-                    auto p1 = p0;
-                    p1.x += mainSize.x;
-                    p1.y += mainSize.y;
+                // Disable context menu on spectrogram
+                //
+                //if (!isContextMenuOpen) {
+                //    auto p1 = p0;
+                //    p1.x += mainSize.x;
+                //    p1.y += mainSize.y;
 
-                    if (ImGui::IsMouseHoveringRect(p0, p1, true)) {
-                        if (ImGui::GetIO().MouseDownDuration[0] > tHoldContextPopup) {
-                            isHoldingDown = true;
-                        }
-                    }
-                }
+                //    if (ImGui::IsMouseHoveringRect(p0, p1, true)) {
+                //        if (ImGui::GetIO().MouseDownDuration[0] > tHoldContextPopup) {
+                //            isHoldingDown = true;
+                //        }
+                //    }
+                //}
 
-                if (ImGui::IsMouseReleased(0) && isHoldingDown) {
-                    auto pos = ImGui::GetMousePos();
-                    ImGui::SetNextWindowPos(pos);
+                //if (ImGui::IsMouseReleased(0) && isHoldingDown) {
+                //    auto pos = ImGui::GetMousePos();
+                //    ImGui::SetNextWindowPos(pos);
 
-                    ImGui::OpenPopup("Message options");
-                    isHoldingDown = false;
-                    isContextMenuOpen = true;
-                }
+                //    ImGui::OpenPopup("Main Options");
+                //    isHoldingDown = false;
+                //    isContextMenuOpen = true;
+                //}
 
-                if (ImGui::BeginPopup("Message options")) {
-                    ImGui::TextDisabled("Rx settings");
-                    ImGui::Separator();
-                    ImGui::PushItemWidth(0.5*mainSize.x);
-
-                    static char buf[64];
-
-                    switch (windowId) {
-                        case WindowId::Settings:
-                        case WindowId::Rx:
-                        case WindowId::Tx:
-                            {
-                                snprintf(buf, 64, "Bin: %3d, Freq: %5.1f Hz", binMin, 0.5*binMin*statsCurrent.sampleRateBase/nBins);
-                                ImGui::DragInt("##binMin", &binMin, 1, 0, binMax - 2, buf);
-                                snprintf(buf, 64, "Bin: %3d, Freq: %5.1f Hz", binMax, 0.5*binMax*statsCurrent.sampleRateBase/nBins);
-                                ImGui::DragInt("##binMax", &binMax, 1, binMin + 1, nBins, buf);
-                                ImGui::DragFloat("##intensityScale", &intensityScale, 1.0f, 1.0f, 1000.0f, "Intensity scale: %.1f");
-                                if (ImGui::BeginCombo("##colormap", ColorMap::kTypeString.at(colorMap))) {
-                                    for (int i = 0; i < (int) ColorMap::kTypeString.size(); ++i) {
-                                        const bool isSelected = (colorMap == i);
-                                        if (ImGui::Selectable(ColorMap::kTypeString.at(ColorMap::Type(i)), isSelected)) {
-                                            colorMap = ColorMap::Type(i);
-                                        }
-
-                                        if (isSelected) {
-                                            ImGui::SetItemDefaultFocus();
-                                        }
-                                    }
-                                    ImGui::EndCombo();
-                                }
-                                ImGui::DragFloat("##height", &rxDataHeight, 1.0f, 4.0f, rxDataHeightMax, "Rx height: %.1f", 1.0f);
-                                ImGui::DragFloat("##fontScale", &rxFontScale, 0.01f, 0.8f, 2.0f, "Font scale: %.2f", 1.0f);
-
-                                if (isFrequencyAuto) {
-                                    frequencySelected_hz = statsCurrent.statistics.estimatedPitch_Hz;
-                                }
-                                if (ImGui::DragFloat("##rxFrequency", &frequencySelected_hz, 1.0f, 200.0f, 1200.0f, "Rx Frequency: %.1f Hz", 1.0f)) {
-                                    isFrequencyAuto = false;
-                                    g_buffer.inputUI.flags.newParametersDecode = true;
-                                }
-                                ImGui::SameLine();
-                                if (ImGui::Checkbox("Auto##rxFrequency", &isFrequencyAuto)) {
-                                    g_buffer.inputUI.flags.newParametersDecode = true;
-                                }
-
-                                if (isSpeedAuto) {
-                                    speedSelected_wpm = statsCurrent.statistics.estimatedSpeed_wpm;
-                                }
-                                if (ImGui::DragFloat("##speed", &speedSelected_wpm, 1.0f, 5.0f, 55.0f, "Rx Speed: %.0f wpm", 1.0f)) {
-                                    isSpeedAuto = false;
-                                    g_buffer.inputUI.flags.newParametersDecode = true;
-                                }
-                                ImGui::SameLine();
-                                if (ImGui::Checkbox("Auto##speed", &isSpeedAuto)) {
-                                    g_buffer.inputUI.flags.newParametersDecode = true;
-                                }
-
-                                ImGui::Checkbox("Show signal", &showSignal);
-                                ImGui::Checkbox("Show stats", &showStats);
-
-                                if (displaySize.x < displaySize.y) {
-                                    ImGui::TextDisabled("Tx settings");
-                                    ImGui::Separator();
-
-                                    snprintf(buf, 64, "Tx Frequency: %5.1f Hz", txFrequency_hz);
-                                    ImGui::DragFloat("##txFrequency", &txFrequency_hz, 1, 200, 1200, buf);
-                                    snprintf(buf, 64, "Characters speed: %2d WPM", txSpeedCharacters_wpm);
-                                    if (ImGui::DragInt("##speedCharacters", &txSpeedCharacters_wpm, 1, 5, 55, buf)) {
-                                        txSpeedFarnsworth_wpm = txSpeedCharacters_wpm;
-                                    }
-                                    snprintf(buf, 64, "Farnsworth speed: %2d WPM", txSpeedFarnsworth_wpm);
-                                    ImGui::DragInt("##speedFarnsworth", &txSpeedFarnsworth_wpm, 1, 5, 55, buf);
-                                    ImGui::Checkbox("Repeat", &txRepeat);
-                                }
-                            } break;
-                    }
-
-                    ImGui::PopItemWidth();
-
-                    ImGui::EndPopup();
-                } else {
-                    isContextMenuOpen = false;
-                }
-
-                if (g_buffer.inputUI.flags.newParametersDecode) {
-                    g_buffer.inputUI.update = true;
-                    g_buffer.inputUI.parametersDecode.frequency_hz = isFrequencyAuto ? -1.0f : frequencySelected_hz;
-                    g_buffer.inputUI.parametersDecode.speed_wpm = isSpeedAuto ? -1.0f : speedSelected_wpm;
-                }
+                //if (ImGui::BeginPopup("Main Options")) {
+                //    ImGui::EndPopup();
+                //} else {
+                //    isContextMenuOpen = false;
+                //}
             }
 
             {
@@ -1020,6 +1153,15 @@ void renderMain() {
                 }
 
                 if (ImGui::BeginPopup("Rx options")) {
+                    ImGui::PushItemWidth(0.5*mainSize.x);
+
+                    ImGui::DragFloat("##height", &rxDataHeight, 0.1f, 4.0f, rxDataHeightMax, "Rx height: %.1f", 1.0f);
+                    ImGui::DragFloat("##fontScale", &rxFontScale, 0.01f, 0.8f, 2.0f, "Font scale: %.2f", 1.0f);
+
+                    ImGui::PopItemWidth();
+
+                    ImGui::Separator();
+
                     if (ImGui::ButtonDisablable("Clear", {}, false)) {
                         rxData.clear();
                         ImGui::CloseCurrentPopup();
@@ -1097,8 +1239,8 @@ void renderMain() {
                     ImGui::PopStyleColor(2);
                 } else {
                     ImGui::TextDisabled("F: %5.1f Hz | S: %d/%d WPM | Repeat: %s",
-                                        txFrequency_hz, txSpeedCharacters_wpm, txSpeedFarnsworth_wpm,
-                                        (txRepeat ? "ON" : "OFF"));
+                                        settings.txFrequency_hz, settings.txSpeedCharacters_wpm, settings.txSpeedFarnsworth_wpm,
+                                        (settings.txRepeat ? "ON" : "OFF"));
                 }
 
                 if (doInputFocus) {
@@ -1175,7 +1317,15 @@ void renderMain() {
                         inputLast = std::string(inputBuf);
                         g_buffer.inputUI.update = true;
                         g_buffer.inputUI.flags.newMessage = true;
-                        g_buffer.inputUI.message = { std::chrono::system_clock::now(), std::string(inputBuf), { settings.volume, txFrequency_hz, (float) txSpeedCharacters_wpm, (float) txSpeedFarnsworth_wpm } };
+                        g_buffer.inputUI.message = {
+                            std::chrono::system_clock::now(),
+                            std::string(inputBuf),
+                            {
+                                settings.volume, settings.txFrequency_hz,
+                                (float) settings.txSpeedCharacters_wpm,
+                                (float) settings.txSpeedFarnsworth_wpm
+                            }
+                        };
 
                         inputBuf[0] = 0;
                         doInputFocus = true;

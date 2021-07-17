@@ -6,9 +6,13 @@
 
 Morse code decoding library.
 
-*Work in progress* ...
+https://user-images.githubusercontent.com/1991296/126041448-6fd3fe52-c137-4448-ad40-ff4fef186682.mp4
 
-Demo: https://ggerganov.com/ggmorse-gui/
+https://user-images.githubusercontent.com/1991296/126041433-201ed39b-bd62-4abf-981b-240106b2f1a9.mp4
+
+https://user-images.githubusercontent.com/1991296/126041445-93e8c683-ba03-4a7c-9d8a-15794df0a11f.mp4
+
+Online Demo: https://ggerganov.com/ggmorse-gui/
 
 ## Details
 

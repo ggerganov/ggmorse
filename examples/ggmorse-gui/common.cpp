@@ -580,6 +580,13 @@ void renderMain() {
 
     const auto & mouse_delta = ImGui::GetIO().MouseDelta;
 
+    if (settings.isFrequencyAuto) {
+        settings.frequencySelected_hz = statsCurrent.statistics.estimatedPitch_Hz;
+    }
+    if (settings.isSpeedAuto) {
+        settings.speedSelected_wpm = statsCurrent.statistics.estimatedSpeed_wpm;
+    }
+
     ImGui::SetNextWindowPos({ 0, 0, });
     ImGui::SetNextWindowSize(displaySize);
     ImGui::Begin("Main", nullptr,
@@ -661,9 +668,6 @@ void renderMain() {
             ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
         }
         {
-            if (settings.isFrequencyAuto) {
-                settings.frequencySelected_hz = statsCurrent.statistics.estimatedPitch_Hz;
-            }
             if (ImGui::DragFloat("##rxFrequency", &settings.frequencySelected_hz, 1.0f, 200.0f, 1200.0f, "%.1f Hz", 1.0f)) {
                 settings.isFrequencyAuto = false;
                 g_buffer.inputUI.flags.newParametersDecode = true;
@@ -682,9 +686,6 @@ void renderMain() {
             ImGui::SetCursorScreenPos({ posSave.x + kLabelWidth, posSave.y });
         }
         {
-            if (settings.isSpeedAuto) {
-                settings.speedSelected_wpm = statsCurrent.statistics.estimatedSpeed_wpm;
-            }
             if (ImGui::DragFloat("##speed", &settings.speedSelected_wpm, 1.0f, 5.0f, 55.0f, "%.0f WPM", 1.0f)) {
                 settings.isSpeedAuto = false;
                 g_buffer.inputUI.flags.newParametersDecode = true;
@@ -959,16 +960,6 @@ void renderMain() {
             ImGui::PopFont();
         }
 
-        if (g_buffer.inputUI.flags.newParametersDecode) {
-            g_buffer.inputUI.update = true;
-            g_buffer.inputUI.parametersDecode.frequency_hz = settings.isFrequencyAuto ? -1.0f : settings.frequencySelected_hz;
-            g_buffer.inputUI.parametersDecode.speed_wpm = settings.isSpeedAuto ? -1.0f : settings.speedSelected_wpm;
-            g_buffer.inputUI.parametersDecode.frequencyRangeMin_hz = settings.binMin*settings.df;
-            g_buffer.inputUI.parametersDecode.frequencyRangeMax_hz = settings.binMax*settings.df;
-            g_buffer.inputUI.parametersDecode.applyFilterHighPass = settings.applyFilterHighPass;
-            g_buffer.inputUI.parametersDecode.applyFilterLowPass = settings.applyFilterLowPass;
-        }
-
         ScrollWhenDraggingOnVoid(ImVec2(0.0f, -mouse_delta.y), ImGuiMouseButton_Left);
 
         ImGui::EndChild();
@@ -1104,23 +1095,45 @@ void renderMain() {
                                       ImGui::ColorConvertFloat4ToU32({ 1.0f, 0.0f, 0.0f, 0.75f }));
                 }
 
+                ImGui::PushFont(ImGui::GetIO().Fonts->Fonts.back());
+
+                const float offset = settings.showSignal ? settings.signalHeight : 0.0f;
+                const float statsHeight = ImGui::GetTextLineHeightWithSpacing();
+                const bool isLocked = !(settings.isFrequencyAuto && settings.isSpeedAuto);
+
                 if (settings.showStats) {
-                    const float offset = settings.showSignal ? settings.signalHeight : 0.0f;
-                    ImGui::PushFont(ImGui::GetIO().Fonts->Fonts.back());
-                    const float statsHeight = ImGui::GetTextLineHeightWithSpacing();
-                    ImGui::SetCursorScreenPos({ p0.x + 0.5f*itemSpacingSave.x, p0.y + wSize.y - offset - 2*statsHeight });
+                    ImGui::SetCursorScreenPos({ p0.x + 1.0f*itemSpacingSave.x + 2*statsHeight, p0.y + wSize.y - offset - 2*statsHeight });
                     ImGui::TextColored({ 1.0f, 1.0f, 0.0f, 1.0f }, "FPS: %4.1f | R: %4.1f ms",
                                        ImGui::GetIO().Framerate,
                                        tLastFrame
                                       );
-                    ImGui::SetCursorScreenPos({ p0.x + 0.5f*itemSpacingSave.x, p0.y + wSize.y - offset - 1*statsHeight });
-                    ImGui::TextColored({ 1.0f, 1.0f, 0.0f, 1.0f }, "F: %6.1f Hz | S: %2.0f WPM | C: %5.3f",
+                    ImGui::SetCursorScreenPos({ p0.x + 1.0f*itemSpacingSave.x + 2*statsHeight, p0.y + wSize.y - offset - 1*statsHeight });
+                    ImGui::TextColored(isLocked ? ImVec4 { 1.0f, 1.0f, 1.0f, 1.0f } : ImVec4 { 1.0f, 1.0f, 0.0f, 1.0f }, "F: %6.1f Hz | S: %2.0f WPM",
                                        statsCurrent.statistics.estimatedPitch_Hz,
-                                       statsCurrent.statistics.estimatedSpeed_wpm,
+                                       statsCurrent.statistics.estimatedSpeed_wpm
+                                      );
+                    ImGui::SameLine();
+                    ImGui::TextColored({ 1.0f, 1.0f, 0.0f, 1.0f }, " | C: %5.3f",
                                        statsCurrent.statistics.costFunction
                                       );
-                    ImGui::PopFont();
                 }
+                ImGui::PopFont();
+
+                ImGui::SetCursorScreenPos({ p0.x + 0.25f*itemSpacingSave.x, p0.y + wSize.y - offset - 2*statsHeight - 0.5f*itemSpacingSave.y});
+
+                const auto iconLock = isLocked ? ICON_FA_LOCK : ICON_FA_UNLOCK_ALT;
+                if (ImGui::Button(iconLock)) {
+                    if (!isLocked) {
+                        settings.isFrequencyAuto = false;
+                        settings.isSpeedAuto = false;
+                        g_buffer.inputUI.flags.newParametersDecode = true;
+                    } else {
+                        settings.isFrequencyAuto = true;
+                        settings.isSpeedAuto = true;
+                        g_buffer.inputUI.flags.newParametersDecode = true;
+                    }
+                }
+
                 ImGui::EndChild();
 
                 ImGui::EndChild();
@@ -1394,6 +1407,16 @@ void renderMain() {
 
     ImGui::GetIO().KeysDown[ImGui::GetIO().KeyMap[ImGuiKey_Backspace]] = false;
     ImGui::GetIO().KeysDown[ImGui::GetIO().KeyMap[ImGuiKey_Enter]] = false;
+
+    if (g_buffer.inputUI.flags.newParametersDecode) {
+        g_buffer.inputUI.update = true;
+        g_buffer.inputUI.parametersDecode.frequency_hz = settings.isFrequencyAuto ? -1.0f : settings.frequencySelected_hz;
+        g_buffer.inputUI.parametersDecode.speed_wpm = settings.isSpeedAuto ? -1.0f : settings.speedSelected_wpm;
+        g_buffer.inputUI.parametersDecode.frequencyRangeMin_hz = settings.binMin*settings.df;
+        g_buffer.inputUI.parametersDecode.frequencyRangeMax_hz = settings.binMax*settings.df;
+        g_buffer.inputUI.parametersDecode.applyFilterHighPass = settings.applyFilterHighPass;
+        g_buffer.inputUI.parametersDecode.applyFilterLowPass = settings.applyFilterLowPass;
+    }
 
     {
         std::lock_guard<std::mutex> lock(g_buffer.mutex);

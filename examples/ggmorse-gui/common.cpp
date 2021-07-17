@@ -638,7 +638,7 @@ void renderMain() {
 
     if (windowId == WindowId::Settings) {
         ImGui::BeginChild("Settings:main", ImGui::GetContentRegionAvail(), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-        ImGui_TextCentered("GGMorse v1.3.0", false);
+        ImGui_TextCentered("GGMorse v1.3.1", false);
         ImGui::PushFont(ImGui::GetIO().Fonts->Fonts.back());
         ImGui::Text("%s", "");
         ImGui_TextCentered("created by", true);
@@ -970,7 +970,9 @@ void renderMain() {
         static float rxFontScale = 1.0f;
 
         const float rxDataHeightMax = std::round(ImGui::GetContentRegionAvail().y/ImGui::GetTextLineHeightWithSpacing()) - 5;
-        rxDataHeight = std::min(rxDataHeight, rxDataHeightMax);
+        if (rxDataHeightMax > 4) {
+            rxDataHeight = std::min(rxDataHeight, rxDataHeightMax);
+        }
 
         if (hasAudioCaptureData == false) {
             ImGui::Text("%s", "");

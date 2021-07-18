@@ -20,7 +20,7 @@ You can easily test the library using the free **GGMorse** application which is 
 <a href="https://apps.apple.com/us/app/ggmorse/id1573531678?itsct=apps_box_badge&amp;itscg=30200&platform=iphone" style="display: inline-block; overflow: hidden; border-radius: 13px; width: 250px; height: 83px;"><img src="https://tools.applemediaservices.com/api/badges/download-on-the-app-store/white/en-us?size=250x83&amp;releaseDate=1625097600&h=d674545a41868f8632e5c37c3c33bfc8" alt="Download on the App Store" style="border-radius: 13px; width: 250px; height: 83px;" height="60px"></a>
 <a href='https://play.google.com/store/apps/details?id=com.ggerganov.GGMorse&pcampaignid=pcampaignidMKT-Other-global-all-co-prtnr-py-PartBadge-Mar2515-1'><img alt='Get it on Google Play' src='https://i.imgur.com/BKDCbKv.png' height="60px"/></a>
 
-Browser Demo: https://ggerganov.com/ggmorse-gui/
+Browser Demo: https://ggmorse.ggerganov.com/
 
 ## Details
 

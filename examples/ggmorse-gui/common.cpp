@@ -651,7 +651,7 @@ void renderMain() {
         ImGui::Separator();
 
         static char buf[64];
-        const float kLabelWidth = ImGui::CalcTextSize("Inp. SR Offset:  ").x;
+        const float kLabelWidth = ImGui::CalcTextSize("Color Map:   ").x;
 
         // Rx settings
         ImGui::Text("%s", "");

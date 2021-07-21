@@ -455,7 +455,7 @@ void renderMain() {
         int binMax = 0;
         float df = 1.0f;
 
-        float volume = 0.10f;
+        float volume = 0.40f;
         float intensityScale = 30.0f;
         float signalHeight = 2*ImGui::GetTextLineHeightWithSpacing();
         float frequencySelected_hz = 550.0f;
@@ -776,7 +776,7 @@ void renderMain() {
                 ImGui::PushStyleColor(ImGuiCol_FrameBgActive, cols[ImGuiCol_WindowBg]);
                 ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, cols[ImGuiCol_WindowBg]);
                 if (ImGui::SliderFloat("##volume", &settings.volume, 0.0f, 1.0f)) {
-                    settings.volume = std::min(settings.volume, 0.5f);
+                    settings.volume = std::min(settings.volume, 1.0f);
                 }
                 ImGui::PopStyleColor(3);
             }

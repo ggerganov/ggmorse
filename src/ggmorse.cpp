@@ -251,7 +251,10 @@ bool GGMorse::setParametersEncode(const ParametersEncode & parameters) {
         return false;
     }
 
+
     m_impl->parametersEncode = parameters;
+
+    m_impl->parametersEncode.volume = std::min(0.99f, m_impl->parametersEncode.volume);
 
     return true;
 }

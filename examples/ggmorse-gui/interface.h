@@ -9,6 +9,8 @@ extern "C" {
 
 void updateMain();
 
+float getStatusBarHeightDevice();
+
 #ifdef __cplusplus
 }
 #endif

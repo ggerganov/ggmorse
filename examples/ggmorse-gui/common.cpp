@@ -1,4 +1,5 @@
 #include "common.h"
+#include "interface.h"
 
 #include "ggmorse-common.h"
 
@@ -572,11 +573,12 @@ void renderMain() {
     const auto sendButtonText = ICON_FA_PLAY_CIRCLE " Send";
     [[maybe_unused]] const double tShowKeyboard = 0.2f;
 #if defined(IOS)
-    const float statusBarHeight = displaySize.x < displaySize.y ? 2.0f*style.ItemSpacing.y : 0.1f;
+    static float statusBarHeightDevice = getStatusBarHeightDevice();
+    const float statusBarHeight = displaySize.x < displaySize.y ? statusBarHeightDevice : 0.1f;
 #else
     const float statusBarHeight = 0.1f;
 #endif
-    const float menuButtonHeight = 24.0f + 2.0f*style.ItemSpacing.y;
+    const float menuButtonHeight = 1.75f*ImGui::GetTextLineHeightWithSpacing();
 
     const auto & mouse_delta = ImGui::GetIO().MouseDelta;
 
@@ -638,7 +640,7 @@ void renderMain() {
 
     if (windowId == WindowId::Settings) {
         ImGui::BeginChild("Settings:main", ImGui::GetContentRegionAvail(), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-        ImGui_TextCentered("GGMorse v1.3.1", false);
+        ImGui_TextCentered("GGMorse v1.3.2", false);
         ImGui::PushFont(ImGui::GetIO().Fonts->Fonts.back());
         ImGui::Text("%s", "");
         ImGui_TextCentered("created by", true);
@@ -957,6 +959,7 @@ void renderMain() {
             ImGui::Text("Time to draw last frame:   %6.2f ms", tLastFrame);
             ImGui::Text("%s", "");
             ImGui::Text("Application framerate: %6.2f fps", ImGui::GetIO().Framerate);
+            ImGui::Text("Status bar height:     %6.2f px", statusBarHeight);
             ImGui::PopFont();
         }
 
@@ -1100,17 +1103,18 @@ void renderMain() {
                 ImGui::PushFont(ImGui::GetIO().Fonts->Fonts.back());
 
                 const float offset = settings.showSignal ? settings.signalHeight : 0.0f;
-                const float statsHeight = ImGui::GetTextLineHeightWithSpacing();
+                const float lockSize = 1.5f*ImGui::GetTextLineHeightWithSpacing();
+                const float statsHeight = 1.0f*ImGui::GetTextLineHeightWithSpacing();
                 const bool isLocked = !(settings.isFrequencyAuto && settings.isSpeedAuto);
 
                 if (settings.showStats) {
-                    ImGui::SetCursorScreenPos({ p0.x + 1.0f*itemSpacingSave.x + 2*statsHeight, p0.y + wSize.y - offset - 2*statsHeight });
+                    ImGui::SetCursorScreenPos({ p0.x + 1.0f*itemSpacingSave.x + 2*lockSize, p0.y + wSize.y - offset - 2*statsHeight });
                     ImGui::TextColored({ 1.0f, 1.0f, 0.0f, 1.0f }, "FPS: %4.1f | R: %4.1f ms",
                                        ImGui::GetIO().Framerate,
                                        tLastFrame
                                       );
-                    ImGui::SetCursorScreenPos({ p0.x + 1.0f*itemSpacingSave.x + 2*statsHeight, p0.y + wSize.y - offset - 1*statsHeight });
-                    ImGui::TextColored(isLocked ? ImVec4 { 1.0f, 1.0f, 1.0f, 1.0f } : ImVec4 { 1.0f, 1.0f, 0.0f, 1.0f }, "F: %6.1f Hz | S: %2.0f WPM",
+                    ImGui::SetCursorScreenPos({ p0.x + 1.0f*itemSpacingSave.x + 2*lockSize, p0.y + wSize.y - offset - 1*statsHeight });
+                    ImGui::TextColored(isLocked ? ImVec4 { 0.0f, 1.0f, 0.0f, 1.0f } : ImVec4 { 1.0f, 1.0f, 0.0f, 1.0f }, "F: %6.1f Hz | S: %2.0f WPM",
                                        statsCurrent.statistics.estimatedPitch_Hz,
                                        statsCurrent.statistics.estimatedSpeed_wpm
                                       );
@@ -1121,10 +1125,10 @@ void renderMain() {
                 }
                 ImGui::PopFont();
 
-                ImGui::SetCursorScreenPos({ p0.x + 0.25f*itemSpacingSave.x, p0.y + wSize.y - offset - 2*statsHeight - 0.5f*itemSpacingSave.y});
+                ImGui::SetCursorScreenPos({ p0.x + 0.25f*itemSpacingSave.x, p0.y + wSize.y - offset - 2.0f*lockSize - 0.5f*itemSpacingSave.y});
 
                 const auto iconLock = isLocked ? ICON_FA_LOCK : ICON_FA_UNLOCK_ALT;
-                if (ImGui::Button(iconLock)) {
+                if (ImGui::Button(iconLock, ImVec2 { 2.0f*lockSize, 2.0f*lockSize })) {
                     if (!isLocked) {
                         settings.isFrequencyAuto = false;
                         settings.isSpeedAuto = false;
@@ -1303,9 +1307,8 @@ void renderMain() {
                                          0.0f, amax, wSize);
                     ImGui::PopStyleColor(2);
                 } else {
-                    ImGui::TextDisabled("F: %5.1f Hz | S: %d/%d WPM | Repeat: %s",
-                                        settings.txFrequency_hz, settings.txSpeedCharacters_wpm, settings.txSpeedFarnsworth_wpm,
-                                        (settings.txRepeat ? "ON" : "OFF"));
+                    ImGui::TextDisabled("F: %5.1f Hz | S: %d/%d WPM",
+                                        settings.txFrequency_hz, settings.txSpeedCharacters_wpm, settings.txSpeedFarnsworth_wpm);
                 }
 
                 if (doInputFocus) {

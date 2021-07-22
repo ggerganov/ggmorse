@@ -309,6 +309,11 @@ bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
     std::string symbols0;
     std::string symbols1;
 
+    // start transmission with an empty signal
+    nSamplesTotal += lendot1_samples;
+    symbols0 += "2";
+    symbols1 += "";
+
     for (int i = 0; i < m_impl->txDataLength; ++i) {
         for (const auto & l : kMorseCode) {
             if (l.second == toUpper(m_impl->txData[i])) {
@@ -347,6 +352,7 @@ bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
             }
         }
     }
+
     // finish transmission with an empty signal
     nSamplesTotal += lendot1_samples;
     symbols0 += "2";

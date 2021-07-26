@@ -1,7 +1,7 @@
 import sys
 import requests
 
-def ggmorse(message: str, frequency_hz: int = 550, speed_wpm: int = 25, sampleRate: float = 48000, volume: int = 50):
+def ggmorse(message: str, frequency_hz: int = 550, speed_wpm: int = 25, sampleRate: float = 4000, volume: int = 50):
 
     url = 'https://ggmorse-to-file.ggerganov.com/'
 

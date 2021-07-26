@@ -81,6 +81,11 @@ endif()
 
 # examples
 
+if (EMSCRIPTEN)
+else()
+    add_subdirectory(ggmorse-to-file)
+endif()
+
 if (GGMORSE_SUPPORT_SDL2)
     add_subdirectory(ggmorse-gui)
 endif()

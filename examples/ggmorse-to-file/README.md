@@ -1,23 +1,13 @@
-## ggwave-to-file
+## ggmorse-to-file
 
 Output a generated waveform to an uncompressed WAV file.
 
 ```
-Usage: ./bin/ggwave-to-file [-vN] [-sN] [-pN]
+Usage: ./bin/ggmorse-to-file [-fN] -[wN] [-vN] [-sN]
+    -fN - frequency of the generated signal, N in [200, 1200], (default: 550)
+    -wN - speed of the transmission in words-per-minute, N in [5, 55], (default: 25)
     -vN - output volume, N in (0, 100], (default: 50)
-    -sN - output sample rate, N in [6000, 96000], (default: 48000)
-    -pN - select the transmission protocol id (default: 1)
-
-    Available protocols:
-      0 - Normal
-      1 - Fast
-      2 - Fastest
-      3 - [U] Normal
-      4 - [U] Fast
-      5 - [U] Fastest
-      6 - [DT] Normal
-      7 - [DT] Fast
-      8 - [DT] Fastest
+    -sN - output sample rate, N in [4000, 96000], (default: 4000)
 ```
 
 ### Examples
@@ -25,19 +15,19 @@ Usage: ./bin/ggwave-to-file [-vN] [-sN] [-pN]
 - Generate waveform with default parameters
 
   ```bash
-  echo "Hello world!" | ./bin/ggwave-to-file > example.wav
+  echo "Hello world!" | ./bin/ggmorse-to-file > example.wav
   ```
 
 - Generate waveform at 24 kHz sample rate
 
   ```bash
-  echo "Hello world!" | ./bin/ggwave-to-file -s24000 > example.wav
+  echo "Hello world!" | ./bin/ggmorse-to-file -s24000 > example.wav
   ```
 
-- Generate ultrasound waveform using the `[U] Fast` protocol
+- Generate waveform at 800 Hz and speed 35 WPM
 
   ```bash
-  echo "Hello world!" | ./bin/ggwave-to-file -p4 > example.wav
+  echo "Hello world!" | ./bin/ggmorse-to-file -f800 -w35 > example.wav
   ```
 
 
@@ -45,29 +35,19 @@ Usage: ./bin/ggwave-to-file [-vN] [-sN] [-pN]
 
 Based on this tool, there is an HTTP service available on the following link:
 
-https://ggwave-to-file.ggerganov.com/
+https://ggmorse-to-file.ggerganov.com/
 
 You can use it to query audio waveforms by specifying the text message as a GET parameter to the HTTP request. Here are a few examples:
 
 ### terminal
 
 ```bash
-# audible example
-curl -sS 'https://ggwave-to-file.ggerganov.com/?m=Hello world!' --output hello.wav
-
-# ultrasound example
-curl -sS 'https://ggwave-to-file.ggerganov.com/?m=Hello world!&p=4' --output hello.wav
+curl -sS 'https://ggmorse-to-file.ggerganov.com/?m=Hello world!' --output hello.wav
 ```
 
 ### browser
 
-- Audible example
-
-  https://ggwave-to-file.ggerganov.com/?m=Hello%20world%21
-
-- Ultrasound example
-
-  https://ggwave-to-file.ggerganov.com/?m=Hello%20world%21&p=4
+-  https://ggmorse-to-file.ggerganov.com/?m=Hello%20world%21
 
 
 ### python
@@ -75,13 +55,14 @@ curl -sS 'https://ggwave-to-file.ggerganov.com/?m=Hello world!&p=4' --output hel
 ```python
 import requests
 
-def ggwave(message: str, protocolId: int = 1, sampleRate: float = 48000, volume: int = 50):
+def ggmorse(message: str, frequency_hz: int = 550, speed_wpm: int = 25, sampleRate: float = 48000, volume: int = 50):
 
-    url = 'https://ggwave-to-file.ggerganov.com/'
+    url = 'https://ggmorse-to-file.ggerganov.com/'
 
     params = {
         'm': message,       # message to encode
-        'p': protocolId,    # transmission protocol to use
+        'f': frequency_hz,  # frequency of the generated signal
+        'w': speed_wpm,     # transmission speed in words-per-minute
         's': sampleRate,    # output sample rate
         'v': volume,        # output volume
     }
@@ -101,7 +82,7 @@ def ggwave(message: str, protocolId: int = 1, sampleRate: float = 48000, volume:
 import sys
 
 # query waveform from server
-result = ggwave("Hello world!")
+result = ggmorse("Hello world!")
 
 # dump wav file to stdout
 sys.stdout.buffer.write(result.content)

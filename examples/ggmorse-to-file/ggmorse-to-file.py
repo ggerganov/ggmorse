@@ -1,13 +1,14 @@
 import sys
 import requests
 
-def ggwave(message: str, protocolId: int = 1, sampleRate: float = 48000, volume: int = 50):
+def ggmorse(message: str, frequency_hz: int = 550, speed_wpm: int = 25, sampleRate: float = 48000, volume: int = 50):
 
-    url = 'https://ggwave-to-file.ggerganov.com/'
+    url = 'https://ggmorse-to-file.ggerganov.com/'
 
     params = {
         'm': message,       # message to encode
-        'p': protocolId,    # transmission protocol to use
+        'f': frequency_hz,  # frequency of the generated signal
+        'w': speed_wpm,     # transmission speed in words-per-minute
         's': sampleRate,    # output sample rate
         'v': volume,        # output volume
     }
@@ -19,6 +20,6 @@ def ggwave(message: str, protocolId: int = 1, sampleRate: float = 48000, volume:
 
     return response
 
-result = ggwave("Hello world!")
+result = ggmorse("Hello world!")
 
 sys.stdout.buffer.write(result.content)

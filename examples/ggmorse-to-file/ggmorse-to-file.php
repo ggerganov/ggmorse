@@ -1,10 +1,11 @@
 <?php
 
-$cmd = "ggwave-to-file";
+$cmd = "ggmorse-to-file";
 
 if (isset($_GET['s'])) { $cmd .= " -s".intval($_GET['s']); }
 if (isset($_GET['v'])) { $cmd .= " -v".intval($_GET['v']); }
-if (isset($_GET['p'])) { $cmd .= " -p".intval($_GET['p']); }
+if (isset($_GET['f'])) { $cmd .= " -f".intval($_GET['f']); }
+if (isset($_GET['w'])) { $cmd .= " -w".intval($_GET['w']); }
 
 $descriptorspec = array(
     0 => array("pipe", "r"),
@@ -12,7 +13,7 @@ $descriptorspec = array(
     2 => array("pipe", "w"),
 );
 
-$path_wav = tempnam("/tmp", "ggwave");
+$path_wav = tempnam("/tmp", "ggmorse");
 $path_mp3 = $path_wav.".mp3";
 
 $cmd .= " > $path_wav";

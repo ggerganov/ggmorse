@@ -32,6 +32,16 @@ int main(int argc, char** argv) {
     int volume = argm["v"].empty() ? 50 : std::stoi(argm["v"]);
     float sampleRateOut = argm["s"].empty() ? GGMorse::kBaseSampleRate : std::stof(argm["s"]);
 
+    if (frequency_hz < 200 || frequency_hz > 1200) {
+        fprintf(stderr, "Invalid frequency\n");
+        return -1;
+    }
+
+    if (speed_wpm < 5 || speed_wpm > 55) {
+        fprintf(stderr, "Invalid speed\n");
+        return -1;
+    }
+
     if (volume <= 0 || volume > 100) {
         fprintf(stderr, "Invalid volume\n");
         return -1;

@@ -52,8 +52,8 @@ int main(int argc, char** argv) {
         return -2;
     }
 
-    if (message.size() > 140) {
-        fprintf(stderr, "Invalid message: size > 140\n");
+    if (message.size() > 256) {
+        fprintf(stderr, "Invalid message: size > 256\n");
         return -3;
     }
 

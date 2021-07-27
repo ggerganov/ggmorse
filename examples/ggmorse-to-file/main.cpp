@@ -11,7 +11,7 @@
 
 int main(int argc, char** argv) {
     fprintf(stderr, "Usage: %s [-fN] -[wN] [-vN] [-sN]\n", argv[0]);
-    fprintf(stderr, "    -fN - frequency of the generated signal, N in [200, 1200], (default: 550)\n");
+    fprintf(stderr, "    -fN - frequency of the generated signal, N in [200, sampleRate/2], (default: 550)\n");
     fprintf(stderr, "    -wN - speed of the transmission in words-per-minute, N in [5, 55], (default: 25)\n");
     fprintf(stderr, "    -vN - output volume, N in (0, 100], (default: 50)\n");
     fprintf(stderr, "    -sN - output sample rate, N in [%d, %d], (default: %d)\n", (int) 4000, (int) 96000, (int) GGMorse::kBaseSampleRate);
@@ -32,7 +32,7 @@ int main(int argc, char** argv) {
     int volume = argm["v"].empty() ? 50 : std::stoi(argm["v"]);
     float sampleRateOut = argm["s"].empty() ? GGMorse::kBaseSampleRate : std::stof(argm["s"]);
 
-    if (frequency_hz < 200 || frequency_hz > 1200) {
+    if (frequency_hz < 200 || frequency_hz > sampleRateOut/2) {
         fprintf(stderr, "Invalid frequency\n");
         return -1;
     }

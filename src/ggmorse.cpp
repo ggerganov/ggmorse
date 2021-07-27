@@ -694,6 +694,8 @@ void GGMorse::decode_float() {
     if (std::fabs(frequency_hz - m_impl->statistics.estimatedPitch_Hz) > 50.0) {
         m_impl->goertzelFilter.recompute(frequency_hz);
         m_impl->rxData.push_back('\n');
+        m_impl->lastInterval = {};
+        m_impl->curLetter = "";
     }
 
     m_impl->statistics.timePitchDetection_ms = dt_ms(tStart_us);

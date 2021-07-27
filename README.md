@@ -48,6 +48,16 @@ These are the things I want to improve before releasing v0.2.0:
 
 Depending on the level of interest this gets, I can also provide various language bindings, similar to [ggwave](https://github.com/ggerganov/ggwave).
 
+## Examples
+
+The [examples](https://github.com/ggerganov/ggmorse/blob/master/examples/) folder contains several sample applications of the library:
+
+
+| Example | Description | Audio |
+| ------- | ----------- | ----- |
+| [ggmorse-to-file](https://github.com/ggerganov/ggmorse/blob/master/examples/ggmorse-to-file) | Output a generated waveform to an uncompressed WAV file | - |
+| [ggmorse-gui](https://github.com/ggerganov/ggmorse/blob/master/examples/ggmorse-gui) | GUI application for decoding Morse code | SDL |
+
 ## Building
 
 ### Dependencies for SDL-based examples

@@ -76,6 +76,7 @@ extern "C" {
 // C++ interface
 //
 
+#include <cstdint>
 #include <memory>
 #include <vector>
 #include <functional>

@@ -10,6 +10,9 @@
 #include <imgui/imgui.h>
 #include <imgui/imgui_internal.h>
 
+#if defined(__APPLE__)
+#define SDL_DISABLE_ARM_NEON_H 1
+#endif
 #include <SDL.h>
 
 #include <array>
@@ -640,7 +643,7 @@ void renderMain() {
 
     if (windowId == WindowId::Settings) {
         ImGui::BeginChild("Settings:main", ImGui::GetContentRegionAvail(), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-        ImGui_TextCentered("GGMorse v1.3.4", false);
+        ImGui_TextCentered("GGMorse v1.3.5", false);
         ImGui::PushFont(ImGui::GetIO().Fonts->Fonts.back());
         ImGui::Text("%s", "");
         ImGui_TextCentered("created by", true);
@@ -812,7 +815,7 @@ void renderMain() {
         }
         {
             snprintf(buf, 64, "%5.1f Hz", settings.txFrequency_hz);
-            ImGui::DragFloat("##txFrequency", &settings.txFrequency_hz, 1, 200, 1200, buf);
+            ImGui::DragFloat("##txFrequency", &settings.txFrequency_hz, 1, 200, 1900, buf);
         }
 
         {

@@ -15,19 +15,19 @@ Usage: ./bin/ggmorse-to-file [-fN] -[wN] [-vN] [-sN]
 - Generate waveform with default parameters
 
   ```bash
-  echo "Hello world!" | ./bin/ggmorse-to-file > example.wav
+  echo "Hello world" | ./bin/ggmorse-to-file > example.wav
   ```
 
 - Generate waveform at 24 kHz sample rate
 
   ```bash
-  echo "Hello world!" | ./bin/ggmorse-to-file -s24000 > example.wav
+  echo "Hello world" | ./bin/ggmorse-to-file -s24000 > example.wav
   ```
 
 - Generate waveform at 800 Hz and speed 35 WPM
 
   ```bash
-  echo "Hello world!" | ./bin/ggmorse-to-file -f800 -w35 > example.wav
+  echo "Hello world" | ./bin/ggmorse-to-file -f800 -w35 > example.wav
   ```
 
 
@@ -42,7 +42,7 @@ You can use it to query audio waveforms by specifying the text message as a GET 
 ### terminal
 
 ```bash
-curl -sS 'https://ggmorse-to-file.ggerganov.com/?m=Hello world!' --output hello.wav
+curl -sS 'https://ggmorse-to-file.ggerganov.com/?m=Hello world' --output hello.wav
 ```
 
 ### browser
@@ -82,7 +82,7 @@ def ggmorse(message: str, frequency_hz: int = 550, speed_wpm: int = 25, sampleRa
 import sys
 
 # query waveform from server
-result = ggmorse("Hello world!")
+result = ggmorse("Hello world")
 
 # dump wav file to stdout
 sys.stdout.buffer.write(result.content)

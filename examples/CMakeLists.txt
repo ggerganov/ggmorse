@@ -84,6 +84,7 @@ endif()
 if (EMSCRIPTEN)
 else()
     add_subdirectory(ggmorse-to-file)
+    add_subdirectory(ggmorse-from-file)
 endif()
 
 if (GGMORSE_SUPPORT_SDL2)

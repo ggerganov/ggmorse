@@ -3,7 +3,7 @@
 Output a generated waveform to an uncompressed WAV file.
 
 ```
-Usage: ./bin/ggmorse-to-file [-fN] -[wN] [-vN] [-sN]
+Usage: ./bin/ggmorse-to-file [-fN] [-wN] [-vN] [-sN]
     -fN - frequency of the generated signal, N in [200, 1200], (default: 550)
     -wN - speed of the transmission in words-per-minute, N in [5, 55], (default: 25)
     -vN - output volume, N in (0, 100], (default: 50)

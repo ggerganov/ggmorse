@@ -1,4 +1,5 @@
 build*/
+.exrc
 .DS_Store
 .ycm_extra_conf.py
 .clangd

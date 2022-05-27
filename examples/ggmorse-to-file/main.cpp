@@ -10,7 +10,7 @@
 #include <iostream>
 
 int main(int argc, char** argv) {
-    fprintf(stderr, "Usage: %s [-fN] -[wN] [-vN] [-sN]\n", argv[0]);
+    fprintf(stderr, "Usage: %s [-fN] [-wN] [-vN] [-sN]\n", argv[0]);
     fprintf(stderr, "    -fN - frequency of the generated signal, N in [100, sampleRate/2], (default: 550)\n");
     fprintf(stderr, "    -wN - speed of the transmission in words-per-minute, N in [5, 140], (default: 25)\n");
     fprintf(stderr, "    -vN - output volume, N in (0, 100], (default: 50)\n");

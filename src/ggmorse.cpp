@@ -683,7 +683,7 @@ void GGMorse::decode_float() {
     m_impl->stfft.process(m_impl->waveform.data(), m_impl->samplesPerFrame);
 
     auto frequency_hz = m_impl->parametersDecode.frequency_hz;
-    auto speed_wpm = m_impl->parametersDecode.speed_wpm;
+    auto speed_wpm    = m_impl->parametersDecode.speed_wpm;
 
     if (frequency_hz <= 0.0f) {
         frequency_hz = m_impl->stfft.pitch(m_impl->parametersDecode.frequencyRangeMin_hz, m_impl->parametersDecode.frequencyRangeMax_hz);
@@ -781,7 +781,7 @@ void GGMorse::decode_float() {
                 intervals.clear();
 
                 int nOnIntervals = 0;
-                float avgOnLength = 0.0f;
+                [[maybe_unused]] float avgOnLength = 0.0f;
 
                 for (int i = 1; i < nSamples; ++i) {
                     int curSignal = filteredF[i] > level ? 1 : 0;

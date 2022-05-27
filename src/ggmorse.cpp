@@ -26,7 +26,8 @@ char toUpper(char c) {
 
 // 0 - dot
 // 1 - dash
-const std::unordered_map<std::string, char> kMorseCode = {
+using TAlphabet = std::unordered_map<std::string, char>;
+const TAlphabet kMorseCode = {
     { "01",      'A',  },
     { "1000",    'B',  },
     { "1010",    'C',  },
@@ -168,6 +169,8 @@ struct GGMorse::Impl {
     Filter filterLowPass = {};
     Resampler resampler = {};
     GoertzelRunningFIR goertzelFilter = {};
+
+    TAlphabet alphabet = kMorseCode;
 };
 
 const GGMorse::Parameters & GGMorse::getDefaultParameters() {
@@ -330,7 +333,7 @@ bool GGMorse::encode(const CBWaveformOut & cbWaveformOut) {
     symbols1 += "";
 
     for (int i = 0; i < m_impl->txDataLength; ++i) {
-        for (const auto & l : kMorseCode) {
+        for (const auto & l : m_impl->alphabet) {
             if (l.second == toUpper(m_impl->txData[i])) {
                 for (int k = 0; k < (int) l.first.size(); ++k) {
                     if (l.first[k] == '0') {
@@ -970,7 +973,7 @@ void GGMorse::decode_float() {
                             if (intervals[j].type == 0 ||
                                 intervals[j].type == 2 ||
                                 intervals[j].type == 3) {
-                                if (auto let = kMorseCode.find(m_impl->curLetter); let != kMorseCode.end()) {
+                                if (auto let = m_impl->alphabet.find(m_impl->curLetter); let != m_impl->alphabet.end()) {
                                     m_impl->rxData.push_back(let->second);
                                     printf("%c", let->second);
                                 } else {
@@ -1042,3 +1045,17 @@ int GGMorse::takeTxWaveformI16(WaveformI16 & dst) {
 
 const GGMorse::Statistics & GGMorse::getStatistics() const { return m_impl->statistics; }
 const GGMorse::Spectrogram GGMorse::getSpectrogram() const { return m_impl->stfft.spectrogram(); }
+
+bool GGMorse::setCharacter(const std::string & s01, char c) {
+    // remove old character
+    for (auto it : m_impl->alphabet) {
+        if (it.second == c) {
+            m_impl->alphabet.erase(it.first);
+            break;
+        }
+    }
+
+    m_impl->alphabet[s01] = c;
+
+    return true;
+}

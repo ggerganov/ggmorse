@@ -11,3 +11,5 @@ target_link_libraries(${TARGET} PRIVATE
     ggmorse-common
     ${CMAKE_THREAD_LIBS_INIT}
     )
+
+install(TARGETS ${TARGET} RUNTIME DESTINATION bin)

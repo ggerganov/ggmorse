@@ -643,7 +643,7 @@ void renderMain() {
 
     if (windowId == WindowId::Settings) {
         ImGui::BeginChild("Settings:main", ImGui::GetContentRegionAvail(), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-        ImGui_TextCentered("GGMorse v1.3.5", false);
+        ImGui_TextCentered("GGMorse v1.3.6", false);
         ImGui::PushFont(ImGui::GetIO().Fonts->Fonts.back());
         ImGui::Text("%s", "");
         ImGui_TextCentered("created by", true);

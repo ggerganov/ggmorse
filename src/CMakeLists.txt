@@ -28,7 +28,9 @@ if (MINGW)
         )
 endif()
 
+include(GNUInstallDirs)
+
 install(TARGETS ${TARGET}
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib/static
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/static
     )

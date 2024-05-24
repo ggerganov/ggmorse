@@ -1,5 +1,7 @@
 set(TARGET ggmorse-gui)
 
+include(GNUInstallDirs)
+
 if (EMSCRIPTEN)
     add_executable(${TARGET} main.cpp common.cpp interface.cpp interface-emscripten.cpp)
 
@@ -44,9 +46,9 @@ else()
         ${CMAKE_THREAD_LIBS_INIT}
         )
 
-    install(FILES ${PROJECT_SOURCE_DIR}/examples/assets/fonts/DroidSans.ttf DESTINATION bin)
-    install(FILES ${PROJECT_SOURCE_DIR}/examples/assets/fonts/ProggyTiny.ttf DESTINATION bin)
-    install(FILES ${PROJECT_SOURCE_DIR}/examples/assets/fonts/fontawesome-webfont.ttf DESTINATION bin)
+    install(FILES ${PROJECT_SOURCE_DIR}/examples/assets/fonts/DroidSans.ttf DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(FILES ${PROJECT_SOURCE_DIR}/examples/assets/fonts/ProggyTiny.ttf DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(FILES ${PROJECT_SOURCE_DIR}/examples/assets/fonts/fontawesome-webfont.ttf DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
-install(TARGETS ${TARGET} RUNTIME DESTINATION bin)
+install(TARGETS ${TARGET} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

@@ -91,14 +91,16 @@ if (GGMORSE_SUPPORT_SDL2)
     add_subdirectory(ggmorse-gui)
 endif()
 
+include(GNUInstallDirs)
+
 install(TARGETS ggmorse-common
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib/static
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/static
     )
 
 if (GGMORSE_SUPPORT_SDL2)
     install(TARGETS ggmorse-common-sdl2
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib/static
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/static
         )
 endif()

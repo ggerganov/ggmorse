@@ -12,4 +12,6 @@ target_link_libraries(${TARGET} PRIVATE
     ${CMAKE_THREAD_LIBS_INIT}
     )
 
-install(TARGETS ${TARGET} RUNTIME DESTINATION bin)
+include(GNUInstallDirs)
+
+install(TARGETS ${TARGET} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

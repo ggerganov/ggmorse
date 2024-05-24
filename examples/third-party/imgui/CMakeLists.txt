@@ -124,14 +124,16 @@ if (GGMORSE_SUPPORT_SDL2)
     endif()
 endif()
 
+include(GNUInstallDirs)
+
 install(TARGETS imgui
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib/static
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/static
     )
 
 if (GGMORSE_SUPPORT_SDL2)
     install(TARGETS imgui-sdl2
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib/static
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/static
         )
 endif()

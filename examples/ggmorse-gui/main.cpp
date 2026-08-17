@@ -14,6 +14,7 @@
 #include <SDL.h>
 #include <SDL_opengl.h>
 
+#include <cstdlib>
 #include <fstream>
 #include <vector>
 #include <functional>
@@ -176,8 +177,15 @@ int main(int argc, char** argv) {
 #endif
 
     auto argm = parseCmdArguments(argc, argv);
-    int captureId = argm["c"].empty() ? 0 : std::stoi(argm["c"]);
+    int captureId = argm["c"].empty() ? -1 : std::stoi(argm["c"]);
     int playbackId = argm["p"].empty() ? 0 : std::stoi(argm["p"]);
+
+    // allow overriding the default (name-matched) capture device via env var, unless -c was passed explicitly
+    if (argm["c"].empty()) {
+        if (const char * defaultCaptureDevice = std::getenv("GGMORSE_CAPTURE_DEVICE")) {
+            GGMorse_setDefaultCaptureDeviceName(defaultCaptureDevice);
+        }
+    }
 
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         fprintf(stderr, "Error: %s\n", SDL_GetError());

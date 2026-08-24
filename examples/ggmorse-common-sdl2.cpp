@@ -7,6 +7,8 @@
 #include <SDL.h>
 #include <SDL_opengl.h>
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 
 #ifdef __EMSCRIPTEN__
@@ -26,6 +28,27 @@ SDL_AudioSpec g_obtainedSpecInp;
 SDL_AudioSpec g_obtainedSpecOut;
 
 std::shared_ptr<GGMorse> g_ggMorse;
+
+std::string toLower(std::string s) {
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
+    return s;
+}
+
+// returns the name of the first capture device whose name contains 'substr' (case-insensitive), or "" if none found
+std::string findCaptureDeviceByNameSubstring(const std::string & substr) {
+    if (substr.empty()) return "";
+
+    const auto needle = toLower(substr);
+    int nDevices = SDL_GetNumAudioDevices(SDL_TRUE);
+    for (int i = 0; i < nDevices; i++) {
+        std::string name = SDL_GetAudioDeviceName(i, SDL_TRUE);
+        if (toLower(name).find(needle) != std::string::npos) {
+            return name;
+        }
+    }
+
+    return "";
+}
 
 }
 
@@ -158,9 +181,14 @@ bool GGMorse_init(
             printf("Attempt to open capture device %d : '%s' ...\n", captureId, SDL_GetAudioDeviceName(captureId, SDL_TRUE));
             g_devIdInp = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(captureId, SDL_TRUE), SDL_TRUE, &captureSpec, &g_obtainedSpecInp, 0);
         } else {
-            printf("Attempt to open default capture device ...\n");
-            g_devIdInp = SDL_OpenAudioDevice(g_defaultCaptureDeviceName.empty() ? nullptr : g_defaultCaptureDeviceName.c_str(),
-                                            SDL_TRUE, &captureSpec, &g_obtainedSpecInp, 0);
+            auto matchedName = findCaptureDeviceByNameSubstring(g_defaultCaptureDeviceName);
+            if (!matchedName.empty()) {
+                printf("Attempt to open capture device matching '%s' : '%s' ...\n", g_defaultCaptureDeviceName.c_str(), matchedName.c_str());
+                g_devIdInp = SDL_OpenAudioDevice(matchedName.c_str(), SDL_TRUE, &captureSpec, &g_obtainedSpecInp, 0);
+            } else {
+                printf("Attempt to open default capture device ...\n");
+                g_devIdInp = SDL_OpenAudioDevice(nullptr, SDL_TRUE, &captureSpec, &g_obtainedSpecInp, 0);
+            }
         }
         if (!g_devIdInp) {
             printf("Couldn't open an audio device for capture: %s!\n", SDL_GetError());

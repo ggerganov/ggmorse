@@ -46,6 +46,7 @@ option(GGMORSE_SUPPORT_SDL2             "ggmorse: support for libSDL2" ${GGMORSE
 
 option(GGMORSE_BUILD_TESTS              "ggmorse: build examples" ${GGMORSE_STANDALONE})
 option(GGMORSE_BUILD_EXAMPLES           "ggmorse: build examples" ${GGMORSE_STANDALONE})
+option(GGMORSE_BUILD_QT                 "ggmorse: build the Qt 6 GUI (does not require SDL2)" OFF)
 
 option(GGMORSE_MALLOC_COUNT             "ggmorse: count memory allocations" OFF)
 
@@ -91,4 +92,8 @@ endif()
 
 if (GGMORSE_BUILD_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+if (GGMORSE_BUILD_QT)
+    add_subdirectory(examples/ggmorse-qt)
 endif()

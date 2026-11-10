@@ -57,6 +57,7 @@ The [examples](https://github.com/ggerganov/ggmorse/blob/master/examples/) folde
 | ------- | ----------- | ----- |
 | [ggmorse-to-file](https://github.com/ggerganov/ggmorse/blob/master/examples/ggmorse-to-file) | Output a generated waveform to an uncompressed WAV file | - |
 | [ggmorse-gui](https://github.com/ggerganov/ggmorse/blob/master/examples/ggmorse-gui) | GUI application for decoding Morse code | SDL |
+| [ggmorse-qt](https://github.com/ggerganov/ggmorse/blob/master/examples/ggmorse-qt) | Qt 6 / QML GUI application for decoding Morse code (build with `-DGGMORSE_BUILD_QT=ON`) | Qt Multimedia |
 
 ## Building
 
